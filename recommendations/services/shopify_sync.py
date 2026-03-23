@@ -16,9 +16,10 @@ logger = logging.getLogger(__name__)
 class ShopifySyncService:
     """Sync beer products from Shopify to local database."""
 
+    # Query only ACTIVE products from Shopify - excludes DRAFT, ARCHIVED, and UNLISTED
     PRODUCTS_QUERY = """
     query getProducts($cursor: String) {
-        products(first: 50, after: $cursor) {
+        products(first: 50, after: $cursor, query: "status:active") {
             pageInfo {
                 hasNextPage
                 endCursor
@@ -239,15 +240,9 @@ class ShopifySyncService:
             try:
                 shopify_gid = product["id"]
                 shopify_id = shopify_gid.split("/")[-1]
-                is_active = product.get("status") == "ACTIVE"
 
-                # Track all products we see
+                # Track all active products we see
                 seen_shopify_ids.add(shopify_id)
-
-                # For inactive products, just mark them inactive
-                if not is_active:
-                    Beer.objects.filter(shopify_id=shopify_id).update(is_active=False)
-                    continue
 
                 transformed = self.transform_product(product)
 
@@ -273,6 +268,16 @@ class ShopifySyncService:
                 error_msg = f"Error processing {product.get('handle', 'unknown')}: {str(e)}"
                 logger.error(error_msg)
                 stats["errors"].append(error_msg)
+
+        # Mark products not seen in this sync as inactive
+        # (they were unlisted, archived, or deleted in Shopify)
+        if seen_shopify_ids:
+            inactive_count = Beer.objects.exclude(
+                shopify_id__in=seen_shopify_ids
+            ).update(is_active=False)
+            if inactive_count:
+                logger.info(f"Marked {inactive_count} products as inactive (not in active sync)")
+                stats["deactivated"] = inactive_count
 
         logger.info(f"Sync complete: {stats}")
         return stats
