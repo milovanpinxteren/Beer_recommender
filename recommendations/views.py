@@ -9,7 +9,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Count
 
-from recommendations.models import Beer, SyncLog
+from celery.result import AsyncResult
+
+from recommendations.models import Beer, SyncLog, CachedUserProfile
 from recommendations.serializers import (
     BeerSerializer,
     BeerMinimalSerializer,
@@ -21,24 +23,13 @@ from recommendations.serializers import (
 )
 from recommendations.services.recommendation_engine import get_recommendations_for_user
 from recommendations.services.style_mapper import get_all_style_categories, get_all_country_regions
+from recommendations.tasks import generate_recommendations_task
 
 logger = logging.getLogger(__name__)
 
 
 class RecommendationsView(APIView):
-    """
-    Get personalized beer recommendations for an Untappd user.
-
-    POST /api/recommendations/
-    {
-        "username": "untappd_username",
-        "limit": 10,
-        "style_filter": "IPA",  // optional
-        "country_filter": "Belgium",  // optional
-        "price_max": 20.00,  // optional
-        "force_refresh": false  // optional
-    }
-    """
+    """Get personalized beer recommendations. Uses async mode when profile needs scraping."""
 
     def post(self, request):
         serializer = RecommendationRequestSerializer(data=request.data)
@@ -50,12 +41,35 @@ class RecommendationsView(APIView):
 
         data = serializer.validated_data
         username = data["username"]
+        force_refresh = data.get("force_refresh", False)
+        async_mode = data.get("async_mode", False)
 
+        # Check if we have a fresh cached profile
+        has_cached_profile = self._has_valid_cache(username, force_refresh)
+
+        # If no cache or force refresh, use async mode to avoid timeout
+        if not has_cached_profile or async_mode:
+            return self._handle_async(data)
+
+        # Profile is cached, can respond synchronously
+        return self._handle_sync(data)
+
+    def _has_valid_cache(self, username, force_refresh):
+        if force_refresh:
+            return False
+        try:
+            cached = CachedUserProfile.objects.get(untappd_username=username)
+            return cached.is_valid and not cached.is_expired(hours=24)
+        except CachedUserProfile.DoesNotExist:
+            return False
+
+    def _handle_sync(self, data):
+        username = data["username"]
         try:
             result = get_recommendations_for_user(
                 username=username,
                 limit=data.get("limit", 10),
-                force_refresh=data.get("force_refresh", False),
+                force_refresh=False,
                 style_filter=data.get("style_filter"),
                 country_filter=data.get("country_filter"),
                 price_max=float(data["price_max"]) if data.get("price_max") else None,
@@ -64,24 +78,74 @@ class RecommendationsView(APIView):
 
             if result is None:
                 return Response(
-                    {
-                        "error": "Profile not found",
-                        "detail": f"Could not find or access Untappd profile for '{username}'. "
-                                  "Make sure the username is correct and the profile is public."
-                    },
+                    {"error": "Profile not found", "detail": "Could not find or access Untappd profile"},
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            # Serialize the result
             response_data = RecommendationResultSerializer(result).data
             return Response(response_data)
 
         except Exception as e:
-            logger.exception(f"Error generating recommendations for {username}")
+            logger.exception("Error generating recommendations for %s", username)
             return Response(
                 {"error": "Internal error", "detail": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def _handle_async(self, data):
+        username = data["username"]
+
+        filters = {}
+        if data.get("style_filter"):
+            filters["style_filter"] = data["style_filter"]
+        if data.get("country_filter"):
+            filters["country_filter"] = data["country_filter"]
+        if data.get("price_max"):
+            filters["price_max"] = float(data["price_max"])
+        if data.get("include_out_of_stock"):
+            filters["include_out_of_stock"] = data["include_out_of_stock"]
+
+        task = generate_recommendations_task.delay(
+            username=username,
+            limit=data.get("limit", 10),
+            force_refresh=data.get("force_refresh", False),
+            **filters
+        )
+
+        return Response({
+            "status": "pending",
+            "task_id": task.id,
+            "message": "Fetching Untappd profile for " + username + ". This may take a minute..."
+        }, status=status.HTTP_202_ACCEPTED)
+
+
+class TaskStatusView(APIView):
+    """Check status of an async recommendation task."""
+
+    def get(self, request, task_id):
+        result = AsyncResult(task_id)
+
+        if result.state == "PENDING":
+            return Response({"status": "pending", "task_id": task_id})
+
+        elif result.state == "SUCCESS":
+            task_result = result.result
+            if task_result.get("success"):
+                return Response({"status": "completed", "result": task_result.get("result")})
+            else:
+                return Response(
+                    {"status": "failed", "error": task_result.get("error", "Unknown error")},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        elif result.state == "FAILURE":
+            return Response(
+                {"status": "failed", "error": str(result.result)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        else:
+            return Response({"status": "processing", "task_id": task_id, "state": result.state})
 
 
 class BeerListView(APIView):
