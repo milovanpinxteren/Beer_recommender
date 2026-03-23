@@ -35,6 +35,7 @@ class ShopifySyncService:
                     variants(first: 1) {
                         edges {
                             node {
+                                id
                                 price
                                 inventoryQuantity
                             }
@@ -215,6 +216,7 @@ class ShopifySyncService:
             "untappd_rating_count": untappd_rating_count,
             "in_stock": (first_variant.get("inventoryQuantity", 0) or 0) > 0,
             "inventory_quantity": first_variant.get("inventoryQuantity", 0) or 0,
+            "variant_id": first_variant.get("id", "").split("/")[-1] if first_variant.get("id") else "",
             "is_active": True,  # Only called for ACTIVE products
             "last_synced": timezone.now(),
         }

@@ -14,6 +14,7 @@ class BeerSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "shopify_id",
+            "variant_id",
             "handle",
             "title",
             "vendor",

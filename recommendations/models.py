@@ -8,6 +8,7 @@ class Beer(models.Model):
     """
     # Shopify identifiers
     shopify_id = models.CharField(max_length=100, unique=True, db_index=True)
+    variant_id = models.CharField(max_length=100, blank=True, db_index=True)  # For Add to Cart
     handle = models.CharField(max_length=255)
     
     # Basic product info
