@@ -214,6 +214,7 @@ class ShopifySyncService:
             "untappd_rating_count": untappd_rating_count,
             "in_stock": (first_variant.get("inventoryQuantity", 0) or 0) > 0,
             "inventory_quantity": first_variant.get("inventoryQuantity", 0) or 0,
+            "is_active": True,  # Only called for ACTIVE products
             "last_synced": timezone.now(),
         }
 
@@ -231,10 +232,21 @@ class ShopifySyncService:
             "errors": [],
         }
 
+        # Track which products we've seen in this sync
+        seen_shopify_ids = set()
+
         for product in self.fetch_all_products():
             try:
-                # Skip drafts
-                if product.get("status") != "ACTIVE":
+                shopify_gid = product["id"]
+                shopify_id = shopify_gid.split("/")[-1]
+                is_active = product.get("status") == "ACTIVE"
+
+                # Track all products we see
+                seen_shopify_ids.add(shopify_id)
+
+                # For inactive products, just mark them inactive
+                if not is_active:
+                    Beer.objects.filter(shopify_id=shopify_id).update(is_active=False)
                     continue
 
                 transformed = self.transform_product(product)

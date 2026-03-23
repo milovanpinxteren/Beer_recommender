@@ -30,9 +30,10 @@ class Beer(models.Model):
     untappd_rating = models.FloatField(null=True, blank=True, db_index=True)
     untappd_rating_count = models.IntegerField(null=True, blank=True)
     
-    # Inventory
+    # Inventory and status
     in_stock = models.BooleanField(default=True, db_index=True)
     inventory_quantity = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True, db_index=True)  # Product is active in Shopify (not draft/archived)
     
     # Derived/computed fields for recommendations
     style_category = models.CharField(max_length=50, blank=True, db_index=True)

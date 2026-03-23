@@ -294,8 +294,8 @@ class RecommendationEngine:
             country_filter: Filter to specific country/region
             price_max: Maximum price filter
         """
-        # Build base queryset
-        queryset = Beer.objects.all()
+        # Build base queryset - only include active products
+        queryset = Beer.objects.filter(is_active=True)
 
         if not include_out_of_stock:
             queryset = queryset.filter(in_stock=True)
