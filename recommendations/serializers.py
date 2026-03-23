@@ -1,0 +1,143 @@
+"""
+DRF Serializers for the recommendations API.
+"""
+
+from rest_framework import serializers
+from recommendations.models import Beer
+
+
+class BeerSerializer(serializers.ModelSerializer):
+    """Serializer for Beer model."""
+
+    class Meta:
+        model = Beer
+        fields = [
+            "id",
+            "shopify_id",
+            "handle",
+            "title",
+            "vendor",
+            "price",
+            "product_url",
+            "image_url",
+            "abv",
+            "ibu",
+            "style",
+            "untappd_style",
+            "country",
+            "year",
+            "untappd_url",
+            "untappd_rating",
+            "untappd_rating_count",
+            "in_stock",
+            "style_category",
+            "country_region",
+            "price_bucket",
+        ]
+
+
+class BeerMinimalSerializer(serializers.ModelSerializer):
+    """Minimal serializer for beer lists."""
+
+    class Meta:
+        model = Beer
+        fields = [
+            "shopify_id",
+            "handle",
+            "title",
+            "vendor",
+            "price",
+            "image_url",
+            "abv",
+            "untappd_rating",
+            "style_category",
+            "in_stock",
+        ]
+
+
+class RecommendedBeerSerializer(serializers.Serializer):
+    """Serializer for a recommended beer with scoring."""
+    beer = BeerSerializer()
+    score = serializers.FloatField()
+    reasons = serializers.ListField(child=serializers.CharField())
+    is_tried = serializers.BooleanField()
+    confidence = serializers.CharField()
+
+
+class ProfileSummarySerializer(serializers.Serializer):
+    """Serializer for user profile summary."""
+    total_checkins = serializers.IntegerField()
+    unique_beers = serializers.IntegerField()
+    top_styles = serializers.ListField(child=serializers.CharField())
+    avg_rating = serializers.FloatField()
+    abv_range = serializers.CharField()
+
+
+class RecommendationResultSerializer(serializers.Serializer):
+    """Serializer for complete recommendation response."""
+    username = serializers.CharField()
+    recommendations = RecommendedBeerSerializer(many=True)
+    tried_beers = RecommendedBeerSerializer(many=True)
+    discovery_picks = RecommendedBeerSerializer(many=True)
+    profile_summary = ProfileSummarySerializer()
+
+
+class RecommendationRequestSerializer(serializers.Serializer):
+    """Serializer for recommendation request parameters."""
+    username = serializers.CharField(
+        required=True,
+        help_text="Untappd username"
+    )
+    limit = serializers.IntegerField(
+        required=False,
+        default=10,
+        min_value=1,
+        max_value=50,
+        help_text="Number of recommendations to return"
+    )
+    force_refresh = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Force re-scrape of user profile"
+    )
+    style_filter = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Filter to specific style category"
+    )
+    country_filter = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        help_text="Filter to specific country or region"
+    )
+    price_max = serializers.DecimalField(
+        required=False,
+        max_digits=10,
+        decimal_places=2,
+        help_text="Maximum price filter"
+    )
+    include_out_of_stock = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Include out of stock beers"
+    )
+
+
+class SyncStatusSerializer(serializers.Serializer):
+    """Serializer for sync status response."""
+    status = serializers.CharField()
+    last_sync = serializers.DateTimeField(allow_null=True)
+    total_beers = serializers.IntegerField()
+    in_stock_beers = serializers.IntegerField()
+
+
+class StyleCategorySerializer(serializers.Serializer):
+    """Serializer for style category list."""
+    category = serializers.CharField()
+    count = serializers.IntegerField()
+
+
+class ErrorSerializer(serializers.Serializer):
+    """Serializer for error responses."""
+    error = serializers.CharField()
+    detail = serializers.CharField(required=False)

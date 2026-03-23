@@ -1,0 +1,40 @@
+{
+  "name": "beer-recommender",
+  "description": "Beer recommendation API for House of Beers",
+  "scripts": {
+    "dokku": {
+      "postdeploy": "python manage.py migrate --noinput"
+    }
+  },
+  "env": {
+    "SECRET_KEY": {
+      "description": "Django secret key",
+      "generator": "secret"
+    },
+    "DEBUG": {
+      "description": "Debug mode",
+      "value": "False"
+    },
+    "ALLOWED_HOSTS": {
+      "description": "Comma-separated list of allowed hosts",
+      "value": "recommendation.houseofbeers.nl"
+    },
+    "CSRF_TRUSTED_ORIGINS": {
+      "description": "Trusted origins for CSRF",
+      "value": "https://recommendation.houseofbeers.nl"
+    },
+    "CORS_ALLOWED_ORIGINS": {
+      "description": "Allowed CORS origins",
+      "value": "https://houseofbeers.nl,https://www.houseofbeers.nl"
+    },
+    "SHOPIFY_DOMAIN": {
+      "description": "Shopify store domain",
+      "required": true
+    },
+    "SHOPIFY_ACCESS_TOKEN": {
+      "description": "Shopify Admin API access token",
+      "required": true
+    }
+  },
+  "addons": ["postgresql:hobby-basic"]
+}
