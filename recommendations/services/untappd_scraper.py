@@ -260,66 +260,69 @@ class UntappdProfileScraper:
             logger.warning(f"Failed to parse beer item: {e}")
             return None
 
-    def _fetch_beers_page(self, username: str, offset: int = 0) -> tuple:
-        """
-        Fetch a page of beers from /user/{username}/beers.
-        Returns (beers, has_more).
-        """
-        url = f"{self.BASE_URL}/user/{username}/beers"
-        if offset > 0:
-            url += f"?offset={offset}"
-
+    def _fetch_profile_stats(self, username: str) -> dict:
+        """Fetch user stats from profile page (total checkins, unique beers)."""
+        url = f"{self.BASE_URL}/user/{username}"
         soup = self._make_request(url)
         if not soup:
-            return [], False
+            return {"total_checkins": 0, "unique_beers": 0}
+
+        stats = {"total_checkins": 0, "unique_beers": 0}
+
+        # Parse stats section - format is: Total, Unique, Badges, Friends
+        stats_elem = soup.select_one(".stats")
+        if stats_elem:
+            stat_items = stats_elem.select(".stat")
+            if len(stat_items) >= 2:
+                try:
+                    total_text = stat_items[0].get_text(strip=True)
+                    stats["total_checkins"] = int(re.sub(r"[^\d]", "", total_text))
+                except (ValueError, IndexError):
+                    pass
+                try:
+                    unique_text = stat_items[1].get_text(strip=True)
+                    stats["unique_beers"] = int(re.sub(r"[^\d]", "", unique_text))
+                except (ValueError, IndexError):
+                    pass
+
+        return stats
+
+    def _fetch_beers_page(self, username: str) -> list:
+        """Fetch beers from user's beers page (first page only due to AJAX limitation)."""
+        url = f"{self.BASE_URL}/user/{username}/beers"
+        soup = self._make_request(url)
+        if not soup:
+            return []
 
         beers = []
-        # Try multiple selectors for beer items
-        beer_items = soup.select(".beer-item, .distinct-list-list .item, #distinct-list .item")
-
-        if not beer_items:
-            # Fallback: look for any container with beer links
-            beer_items = soup.select("div[class*='beer'], div[class*='item']")
+        beer_items = soup.select(".beer-item")
 
         for item in beer_items:
             beer = self._parse_beer_item(item)
             if beer and beer.beer_name:
                 beers.append(beer)
 
-        # Check for more pages
-        has_more = False
-        more_link = soup.select_one("a.more, a[href*='offset='], .pagination a")
-        if more_link:
-            has_more = True
-
-        return beers, has_more
+        return beers
 
     def fetch_user_beers(self, username: str) -> list[CheckIn]:
-        """Fetch all beers for a user from /beers page up to max_checkins limit."""
-        all_beers = []
-        offset = 0
-        has_more = True
-
-        while has_more and len(all_beers) < self.max_checkins:
-            beers, has_more = self._fetch_beers_page(username, offset)
-
-            if not beers:
-                break
-
-            all_beers.extend(beers)
-            offset += len(beers)
-            logger.info(f"Fetched {len(all_beers)} beers for {username}")
-
-        return all_beers[:self.max_checkins]
+        """Fetch beers for a user (limited to first page due to AJAX auth requirement)."""
+        beers = self._fetch_beers_page(username)
+        logger.info(f"Fetched {len(beers)} beers for {username}")
+        return beers
 
     def build_taste_profile(self, username: str) -> UserTasteProfile:
         """Build a complete taste profile from user's beers."""
         from recommendations.services.style_mapper import get_style_category
 
+        # Get actual stats from profile page
+        stats = self._fetch_profile_stats(username)
+
+        # Get beer samples from beers page
         checkins = self.fetch_user_beers(username)
 
         profile = UserTasteProfile(username=username)
-        profile.total_checkins = len(checkins)
+        # Use actual stats from profile, not scraped sample count
+        profile.total_checkins = stats.get("total_checkins", len(checkins))
 
         seen_beers = set()
 
@@ -367,7 +370,8 @@ class UntappdProfileScraper:
 
             profile.checkins.append(checkin)
 
-        profile.unique_beers = len(seen_beers)
+        # Use actual unique count from profile stats
+        profile.unique_beers = stats.get("unique_beers", len(seen_beers))
 
         return profile
 

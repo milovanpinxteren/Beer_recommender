@@ -119,7 +119,7 @@ SHOPIFY_API_VERSION = '2024-10'
 
 # Untappd Scraping Configuration
 UNTAPPD_REQUEST_DELAY = 1.5  # seconds between requests
-UNTAPPD_MAX_CHECKINS = 500  # max checkins to analyze per user
+UNTAPPD_MAX_CHECKINS = 3000  # max checkins to analyze per user
 
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('REDIS_URL') or f"sqla+{os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3')}"
