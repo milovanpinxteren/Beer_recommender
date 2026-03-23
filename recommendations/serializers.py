@@ -121,6 +121,11 @@ class RecommendationRequestSerializer(serializers.Serializer):
         default=False,
         help_text="Include out of stock beers"
     )
+    async_mode = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text="Return task ID immediately instead of waiting"
+    )
 
 
 class SyncStatusSerializer(serializers.Serializer):

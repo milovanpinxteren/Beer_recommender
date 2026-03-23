@@ -32,6 +32,8 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
+    'django_celery_beat',
+    'django_celery_results',
     # Local
     'recommendations',
 ]
@@ -119,6 +121,25 @@ SHOPIFY_API_VERSION = '2024-10'
 UNTAPPD_REQUEST_DELAY = 1.5  # seconds between requests
 UNTAPPD_MAX_CHECKINS = 500  # max checkins to analyze per user
 
+# Celery Configuration
+CELERY_BROKER_URL = os.getenv('REDIS_URL') or f"sqla+{os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3')}"
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# Celery Beat Schedule - nightly sync at 3 AM
+CELERY_BEAT_SCHEDULE = {
+    'sync-shopify-nightly': {
+        'task': 'recommendations.tasks.sync_shopify_catalog',
+        'schedule': 60 * 60 * 24,  # Every 24 hours (will be set properly via admin)
+    },
+}
+
+# Use django-celery-beat for dynamic schedules
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
 # Logging
 LOGGING = {
     'version': 1,
@@ -143,6 +164,11 @@ LOGGING = {
         'recommendations': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        'celery': {
+            'handlers': ['console'],
+            'level': 'INFO',
             'propagate': False,
         },
     },
