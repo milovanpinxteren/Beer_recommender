@@ -1,5 +1,5 @@
-<!-- Beer Recommendation Widget for House of Beers -->
-<!-- Paste this code into a Shopify custom HTML section or page -->
+<!-- Bier Aanbevelingen Widget voor House of Beers -->
+<!-- Plak deze code in een Shopify custom HTML sectie of pagina -->
 
 <style>
   .beer-rec-widget {
@@ -36,10 +36,10 @@
 
   /* Profile with radar chart */
   .beer-rec-profile { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px; padding: 25px; margin-bottom: 30px; }
-  .beer-rec-profile h3 { margin: 0 0 20px 0; font-size: 20px; }
+  .beer-rec-profile h3 { margin: 0 0 20px 0; font-size: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
   .beer-rec-profile-content { display: flex; flex-wrap: wrap; gap: 30px; align-items: center; }
-  .beer-rec-radar-container { flex: 0 0 300px; display: flex; justify-content: center; }
-  .beer-rec-radar-canvas { width: 300px; height: 300px; }
+  .beer-rec-radar-container { flex: 0 0 350px; display: flex; justify-content: center; }
+  .beer-rec-radar-canvas { width: 350px; height: 350px; }
   .beer-rec-profile-info { flex: 1; min-width: 250px; }
   .beer-rec-profile-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
   .beer-rec-stat { background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 8px; min-width: 90px; }
@@ -62,26 +62,26 @@
   .beer-rec-carousel-btn.prev { left: -18px; }
   .beer-rec-carousel-btn.next { right: -18px; }
 
-  /* Compact cards */
-  .beer-rec-card { flex: 0 0 170px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
+  /* Beer cards - improved image handling */
+  .beer-rec-card { flex: 0 0 180px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; }
   .beer-rec-card:hover { transform: translateY(-4px); box-shadow: 0 6px 20px rgba(0,0,0,0.12); }
-  .beer-rec-card-image-wrapper { width: 100%; height: 120px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .beer-rec-card-image { max-width: 100%; max-height: 110px; width: auto; height: auto; object-fit: contain; }
-  .beer-rec-card-body { padding: 10px; }
-  .beer-rec-card-title { font-size: 12px; font-weight: 600; color: #2c3e50; margin: 0 0 4px 0; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; height: 32px; }
-  .beer-rec-card-brewery { font-size: 10px; color: #888; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .beer-rec-card-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
-  .beer-rec-badge { display: inline-flex; align-items: center; background: #f0f0f0; padding: 2px 5px; border-radius: 10px; font-size: 9px; color: #555; }
+  .beer-rec-card-image-wrapper { width: 100%; height: 160px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px; }
+  .beer-rec-card-image { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+  .beer-rec-card-body { padding: 12px; flex: 1; display: flex; flex-direction: column; }
+  .beer-rec-card-title { font-size: 13px; font-weight: 600; color: #2c3e50; margin: 0 0 4px 0; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 34px; }
+  .beer-rec-card-brewery { font-size: 11px; color: #888; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .beer-rec-card-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+  .beer-rec-badge { display: inline-flex; align-items: center; background: #f0f0f0; padding: 3px 6px; border-radius: 10px; font-size: 10px; color: #555; }
   .beer-rec-badge-rating { background: #fff3cd; color: #856404; }
-  .beer-rec-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-  .beer-rec-price { font-size: 14px; font-weight: bold; color: #2c3e50; }
-  .beer-rec-add-btn { background: #c9a227; color: white; border: none; padding: 6px 10px; border-radius: 4px; font-size: 10px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
+  .beer-rec-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: auto; }
+  .beer-rec-price { font-size: 15px; font-weight: bold; color: #2c3e50; }
+  .beer-rec-add-btn { background: #c9a227; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap; text-decoration: none; display: inline-block; text-align: center; }
   .beer-rec-add-btn:hover { background: #a8871e; }
   .beer-rec-add-btn:disabled { background: #ccc; cursor: not-allowed; }
   .beer-rec-add-btn.added { background: #28a745; }
 
   .beer-rec-tried { border: 2px solid #17a2b8; }
-  .beer-rec-tried-badge { background: #17a2b8; color: white; padding: 3px 6px; font-size: 9px; font-weight: 600; text-align: center; }
+  .beer-rec-tried-badge { background: #17a2b8; color: white; padding: 4px 8px; font-size: 10px; font-weight: 600; text-align: center; }
 
   .beer-rec-section { margin-top: 30px; }
   .beer-rec-section h4 { font-size: 18px; color: #666; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #eee; }
@@ -90,8 +90,8 @@
   .beer-rec-confidence-medium { border-left: 3px solid #ffc107; }
   .beer-rec-confidence-low { border-left: 3px solid #6c757d; }
 
-  .beer-rec-share-btn { background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-left: 15px; transition: background 0.2s; }
-  .beer-rec-share-btn:hover { background: #5a6fd6; }
+  .beer-rec-share-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: background 0.2s; }
+  .beer-rec-share-btn:hover { background: rgba(255,255,255,0.3); }
   .beer-rec-share-btn svg { width: 16px; height: 16px; }
   .beer-rec-toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: white; padding: 12px 20px; border-radius: 8px; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
   .beer-rec-toast.show { opacity: 1; }
@@ -100,16 +100,18 @@
     .beer-rec-widget { padding: 15px; }
     .beer-rec-form-grid { grid-template-columns: 1fr; }
     .beer-rec-profile-content { flex-direction: column; }
-    .beer-rec-radar-container { flex: 0 0 auto; }
+    .beer-rec-radar-container { flex: 0 0 auto; width: 100%; }
+    .beer-rec-radar-canvas { width: 100%; max-width: 350px; height: auto; aspect-ratio: 1; }
     .beer-rec-carousel-btn { display: none; }
-    .beer-rec-card { flex: 0 0 150px; }
+    .beer-rec-card { flex: 0 0 160px; }
+    .beer-rec-card-image-wrapper { height: 140px; }
   }
 </style>
 
 <div class="beer-rec-widget" id="beerRecWidget">
   <div class="beer-rec-header">
-    <h2>Personalized Beer Recommendations</h2>
-    <p>Get beer recommendations based on your taste profile</p>
+    <h2>Persoonlijke Bieraanbevelingen</h2>
+    <p>Krijg bieraanbevelingen op basis van jouw smaakprofiel</p>
   </div>
 
   <div class="beer-rec-form">
@@ -117,7 +119,7 @@
     <div class="beer-rec-input-toggle">
       <button type="button" class="beer-rec-toggle-btn active" data-type="email" onclick="beerRec.setInputType('email')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        My Email
+        Mijn E-mail
       </button>
       <button type="button" class="beer-rec-toggle-btn" data-type="untappd" onclick="beerRec.setInputType('untappd')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
@@ -128,45 +130,45 @@
     <div class="beer-rec-form-grid">
       <!-- Email Input (default) -->
       <div class="beer-rec-field beer-rec-input-email">
-        <label for="customerEmail">Your Email Address</label>
-        <input type="email" id="customerEmail" placeholder="your@email.com" />
-        <span class="beer-rec-field-hint">We'll analyze your order history to find beers you'll love</span>
+        <label for="customerEmail">Jouw E-mailadres</label>
+        <input type="email" id="customerEmail" placeholder="jouw@email.nl" />
+        <span class="beer-rec-field-hint">We analyseren je bestelgeschiedenis om bieren te vinden die je lekker vindt</span>
       </div>
 
       <!-- Untappd Input (hidden by default) -->
       <div class="beer-rec-field beer-rec-input-untappd" style="display: none;">
-        <label for="untappdUsername">Untappd Username</label>
-        <input type="text" id="untappdUsername" placeholder="e.g., craftbeerlover" />
-        <span class="beer-rec-field-hint">We'll analyze your Untappd check-ins</span>
+        <label for="untappdUsername">Untappd Gebruikersnaam</label>
+        <input type="text" id="untappdUsername" placeholder="bijv. bierfanaat123" />
+        <span class="beer-rec-field-hint">We analyseren je Untappd check-ins</span>
       </div>
 
       <div class="beer-rec-field">
-        <label for="maxPrice">Max Price</label>
-        <input type="number" id="maxPrice" placeholder="No limit" min="0" step="0.50" />
+        <label for="maxPrice">Max Prijs</label>
+        <input type="number" id="maxPrice" placeholder="Geen limiet" min="0" step="0.50" />
       </div>
       <div class="beer-rec-field">
-        <label for="numRecs">Number of Recommendations</label>
+        <label for="numRecs">Aantal Aanbevelingen</label>
         <select id="numRecs">
-          <option value="5">5 beers</option>
-          <option value="10" selected>10 beers</option>
-          <option value="15">15 beers</option>
-          <option value="20">20 beers</option>
+          <option value="5">5 bieren</option>
+          <option value="10" selected>10 bieren</option>
+          <option value="15">15 bieren</option>
+          <option value="20">20 bieren</option>
         </select>
       </div>
       <div class="beer-rec-field">
-        <label for="styleFilter">Style (optional)</label>
+        <label for="styleFilter">Stijl (optioneel)</label>
         <select id="styleFilter">
-          <option value="">All styles</option>
+          <option value="">Alle stijlen</option>
         </select>
       </div>
     </div>
-    <button class="beer-rec-btn" id="getRecsBtn" onclick="beerRec.getRecommendations()">Get My Recommendations</button>
+    <button class="beer-rec-btn" id="getRecsBtn" onclick="beerRec.getRecommendations()">Toon Mijn Aanbevelingen</button>
   </div>
 
   <div id="beerRecLoading" class="beer-rec-loading" style="display: none;">
     <div class="beer-rec-spinner"></div>
-    <p>Analyzing your taste profile...</p>
-    <p style="font-size: 14px; color: #888;">This may take a moment for new users</p>
+    <p>Je smaakprofiel wordt geanalyseerd...</p>
+    <p style="font-size: 14px; color: #888;">Dit kan even duren voor nieuwe gebruikers</p>
   </div>
 
   <div id="beerRecError" class="beer-rec-error" style="display: none;"></div>
@@ -181,6 +183,7 @@ var beerRec = (function() {
   var currentInputType = "email";  // 'email' or 'untappd'
   var lastRecData = null;
   var lastProfileData = null;
+  var shareToken = null;  // For sharing cached profiles
 
   // Check URL params on page load
   initFromUrl();
@@ -190,8 +193,12 @@ var beerRec = (function() {
     var params = new URLSearchParams(window.location.search);
     var username = params.get("untappd");
     var email = params.get("email");
+    var share = params.get("share");
 
-    if (email) {
+    if (share) {
+      // Shared link - load directly
+      loadSharedProfile(share);
+    } else if (email) {
       setInputType("email");
       document.getElementById("customerEmail").value = email;
       setTimeout(function() { getRecommendations(); }, 500);
@@ -199,6 +206,23 @@ var beerRec = (function() {
       setInputType("untappd");
       document.getElementById("untappdUsername").value = username;
       setTimeout(function() { getRecommendations(); }, 500);
+    }
+  }
+
+  function loadSharedProfile(token) {
+    // Token format: type_identifier (e.g., "untappd_craftbeerlover" or "email_hash")
+    var parts = token.split("_");
+    if (parts.length >= 2) {
+      var type = parts[0];
+      var identifier = parts.slice(1).join("_");
+
+      if (type === "untappd") {
+        setInputType("untappd");
+        document.getElementById("untappdUsername").value = identifier;
+        currentIdentifier = identifier;
+        setTimeout(function() { getRecommendations(); }, 500);
+      }
+      // For email shares, we use a hashed identifier stored on the server
     }
   }
 
@@ -228,9 +252,10 @@ var beerRec = (function() {
 
   function updateUrl(identifier, type) {
     var url = new URL(window.location.href);
+    url.searchParams.delete("share");
     if (type === "email") {
       url.searchParams.delete("untappd");
-      url.searchParams.set("email", identifier);
+      url.searchParams.delete("email"); // Don't put email in URL for privacy
     } else {
       url.searchParams.delete("email");
       url.searchParams.set("untappd", identifier);
@@ -240,26 +265,26 @@ var beerRec = (function() {
 
   function getShareUrl() {
     var url = new URL(window.location.href);
-    if (currentInputType === "email") {
-      // Don't share email URLs for privacy - use a generic link
-      url.searchParams.delete("email");
-      url.searchParams.delete("untappd");
-    } else {
+    url.searchParams.delete("email");
+    url.searchParams.delete("untappd");
+
+    // Create share token
+    if (currentInputType === "untappd") {
       url.searchParams.set("untappd", currentIdentifier);
+    } else {
+      // For email profiles, also share via untappd-style param
+      // The recommendations will be loaded from the cached profile
+      url.searchParams.set("share", "email_" + btoa(currentIdentifier).replace(/=/g, ""));
     }
     return url.toString();
   }
 
   function copyShareLink() {
-    if (currentInputType === "email") {
-      showToast("Sharing is not available for email-based recommendations");
-      return;
-    }
     var shareUrl = getShareUrl();
     navigator.clipboard.writeText(shareUrl).then(function() {
-      showToast("Link copied to clipboard!");
+      showToast("Link gekopieerd naar klembord!");
     }).catch(function() {
-      prompt("Copy this link:", shareUrl);
+      prompt("Kopieer deze link:", shareUrl);
     });
   }
 
@@ -286,19 +311,19 @@ var beerRec = (function() {
 
     if (currentInputType === "email") {
       var email = document.getElementById("customerEmail").value.trim();
-      if (!email) { showError("Please enter your email address"); return; }
-      if (!email.includes("@")) { showError("Please enter a valid email address"); return; }
+      if (!email) { showError("Vul je e-mailadres in"); return; }
+      if (!email.includes("@")) { showError("Vul een geldig e-mailadres in"); return; }
       currentIdentifier = email;
       body.email = email;
     } else {
       var username = document.getElementById("untappdUsername").value.trim();
-      if (!username) { showError("Please enter your Untappd username"); return; }
+      if (!username) { showError("Vul je Untappd gebruikersnaam in"); return; }
       currentIdentifier = username;
       body.username = username;
     }
 
     updateUrl(currentIdentifier, currentInputType);
-    showLoading(true, "Submitting request...");
+    showLoading(true, "Verzoek wordt verstuurd...");
     hideError();
     document.getElementById("beerRecResults").style.display = "none";
 
@@ -317,14 +342,14 @@ var beerRec = (function() {
       var data = result.data;
       if (data.status === "pending" && data.task_id) {
         var loadingMsg = currentInputType === "email"
-          ? "Analyzing your order history... This may take a moment."
-          : "Fetching your Untappd profile... This may take up to a minute.";
+          ? "Je bestelgeschiedenis wordt geanalyseerd... Even geduld."
+          : "Je Untappd profiel wordt opgehaald... Dit kan een minuutje duren.";
         showLoading(true, loadingMsg);
         pollForResult(data.task_id, data.profile_type || currentInputType);
       } else if (result.ok) {
         fetchProfileAndDisplay(data);
       } else {
-        throw new Error(data.detail || data.error || "Failed to get recommendations");
+        throw new Error(data.detail || data.error || "Kon geen aanbevelingen ophalen");
       }
     })
     .catch(function(error) { showError(error.message); showLoading(false); });
@@ -333,18 +358,18 @@ var beerRec = (function() {
   function pollForResult(taskId, profileType) {
     var maxAttempts = 60, attempts = 0;
     function poll() {
-      if (attempts >= maxAttempts) { showError("Request timed out. Please try again."); showLoading(false); return; }
+      if (attempts >= maxAttempts) { showError("Verzoek duurde te lang. Probeer het opnieuw."); showLoading(false); return; }
       setTimeout(function() {
         attempts++;
         fetch(API_BASE + "/tasks/" + taskId + "/")
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data.status === "completed") { fetchProfileAndDisplay(data.result, profileType); }
-            else if (data.status === "failed") { showError(data.error || "Failed to generate recommendations"); showLoading(false); }
+            else if (data.status === "failed") { showError(data.error || "Kon geen aanbevelingen genereren"); showLoading(false); }
             else {
               var loadingMsg = profileType === "shopify"
-                ? "Analyzing your purchase history..."
-                : "Analyzing your taste profile...";
+                ? "Je aankoopgeschiedenis wordt geanalyseerd..."
+                : "Je smaakprofiel wordt geanalyseerd...";
               showLoading(true, loadingMsg);
               poll();
             }
@@ -387,16 +412,20 @@ var beerRec = (function() {
     var ctx = canvas.getContext("2d");
     var width = canvas.width, height = canvas.height;
     var centerX = width / 2, centerY = height / 2;
-    var radius = Math.min(width, height) / 2 - 50;
+    var radius = Math.min(width, height) / 2 - 60;
 
-    var axes = profileData.radar_chart.axes || [];
-    var values = profileData.radar_chart.values || [];
+    var radarData = profileData.radar_chart;
+    var axes = radarData.axes || [];
+    var values = radarData.values || [];
+    var details = radarData.details || [];
 
-    if (axes.length < 3) {
+    // Check for insufficient data
+    if (axes.length < 3 || radarData.insufficient_data) {
       ctx.fillStyle = "rgba(255,255,255,0.8)";
       ctx.font = "14px sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Not enough data for radar chart", centerX, centerY);
+      ctx.fillText("Probeer meer bierstijlen om", centerX, centerY - 10);
+      ctx.fillText("je smaakwiel te zien!", centerX, centerY + 10);
       return;
     }
 
@@ -406,10 +435,10 @@ var beerRec = (function() {
     ctx.clearRect(0, 0, width, height);
 
     // Draw grid circles
-    ctx.strokeStyle = "rgba(255,255,255,0.2)";
-    ctx.lineWidth = 1;
-    for (var level = 1; level <= 4; level++) {
-      var levelRadius = (radius * level) / 4;
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 1.5;
+    for (var level = 1; level <= 5; level++) {
+      var levelRadius = (radius * level) / 5;
       ctx.beginPath();
       for (var i = 0; i <= numPoints; i++) {
         var angle = (i % numPoints) * angleStep - Math.PI / 2;
@@ -421,7 +450,8 @@ var beerRec = (function() {
     }
 
     // Draw axis lines
-    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.strokeStyle = "rgba(255,255,255,0.4)";
+    ctx.lineWidth = 1.5;
     for (var i = 0; i < numPoints; i++) {
       var angle = i * angleStep - Math.PI / 2;
       ctx.beginPath();
@@ -430,20 +460,27 @@ var beerRec = (function() {
       ctx.stroke();
     }
 
+    // Apply minimum value boost for visibility (min 25% so all tried styles are visible)
+    var boostedValues = values.map(function(v) {
+      if (v > 0 && v < 25) return 25 + (v * 0.5);
+      return v;
+    });
+
     // Draw data polygon
     ctx.beginPath();
-    ctx.fillStyle = "rgba(201, 162, 39, 0.35)";
+    ctx.fillStyle = "rgba(201, 162, 39, 0.5)";
     ctx.strokeStyle = "rgba(201, 162, 39, 1)";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 3;
 
     for (var i = 0; i <= numPoints; i++) {
       var idx = i % numPoints;
       var angle = idx * angleStep - Math.PI / 2;
-      var value = (values[idx] || 0) / 100; // Normalize 0-100 to 0-1
+      var value = (boostedValues[idx] || 0) / 100;
       var x = centerX + radius * value * Math.cos(angle);
       var y = centerY + radius * value * Math.sin(angle);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
@@ -451,28 +488,36 @@ var beerRec = (function() {
     ctx.fillStyle = "#c9a227";
     for (var i = 0; i < numPoints; i++) {
       var angle = i * angleStep - Math.PI / 2;
-      var value = (values[i] || 0) / 100;
+      var value = (boostedValues[i] || 0) / 100;
       var x = centerX + radius * value * Math.cos(angle);
       var y = centerY + radius * value * Math.sin(angle);
       ctx.beginPath();
-      ctx.arc(x, y, 4, 0, 2 * Math.PI);
+      ctx.arc(x, y, 6, 0, 2 * Math.PI);
       ctx.fill();
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
-    // Draw labels
-    ctx.fillStyle = "rgba(255,255,255,0.95)";
-    ctx.font = "bold 10px sans-serif";
+    // Draw labels with count
+    ctx.fillStyle = "rgba(255,255,255,1)";
+    ctx.font = "bold 12px sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
     for (var i = 0; i < numPoints; i++) {
       var angle = i * angleStep - Math.PI / 2;
-      var labelRadius = radius + 30;
+      var labelRadius = radius + 35;
       var x = centerX + labelRadius * Math.cos(angle);
       var y = centerY + labelRadius * Math.sin(angle);
+
       var label = axes[i] || "";
+      var detail = details[i];
+      var countLabel = detail ? " (" + detail.count + ")" : "";
+
+      // Truncate long labels
       if (label.length > 10) label = label.substring(0, 8) + "..";
-      ctx.fillText(label, x, y);
+      ctx.fillText(label + countLabel, x, y);
     }
   }
 
@@ -495,19 +540,21 @@ var beerRec = (function() {
     var displayName = recData.display_name || currentIdentifier;
 
     // Labels differ based on profile type
-    var checkinsLabel = isShopifyProfile ? "Beers Bought" : "Check-ins";
-    var ratingLabel = isShopifyProfile ? "Quality Score" : "Avg Rating";
-    var shareBtn = isShopifyProfile ? "" : '<button class="beer-rec-share-btn" onclick="beerRec.copyShareLink()" title="Copy shareable link"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path></svg>Share</button>';
+    var checkinsLabel = isShopifyProfile ? "Gekochte Bieren" : "Check-ins";
+    var ratingLabel = isShopifyProfile ? "Kwaliteitsscore" : "Gem. Beoordeling";
 
-    var html = '<div class="beer-rec-profile"><h3>Your Taste Profile ' + shareBtn + '</h3><div class="beer-rec-profile-content">';
-    html += '<div class="beer-rec-radar-container"><canvas id="' + canvasId + '" class="beer-rec-radar-canvas" width="300" height="300"></canvas></div>';
+    // Share button always available
+    var shareBtn = '<button class="beer-rec-share-btn" onclick="beerRec.copyShareLink()" title="Deel je aanbevelingen"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path></svg>Delen</button>';
+
+    var html = '<div class="beer-rec-profile"><h3>Jouw Smaakprofiel ' + shareBtn + '</h3><div class="beer-rec-profile-content">';
+    html += '<div class="beer-rec-radar-container"><canvas id="' + canvasId + '" class="beer-rec-radar-canvas" width="350" height="350"></canvas></div>';
     html += '<div class="beer-rec-profile-info"><div class="beer-rec-profile-stats">';
     html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + totalCheckins + '</div><div class="beer-rec-stat-label">' + checkinsLabel + '</div></div>';
-    html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + uniqueBeers + '</div><div class="beer-rec-stat-label">Unique Beers</div></div>';
+    html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + uniqueBeers + '</div><div class="beer-rec-stat-label">Unieke Bieren</div></div>';
     if (!isShopifyProfile) {
       html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + parseFloat(avgRating).toFixed(1) + '</div><div class="beer-rec-stat-label">' + ratingLabel + '</div></div>';
     }
-    html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + abvRange + '</div><div class="beer-rec-stat-label">ABV Range</div></div>';
+    html += '<div class="beer-rec-stat"><div class="beer-rec-stat-value">' + abvRange + '</div><div class="beer-rec-stat-label">ABV Bereik</div></div>';
     html += '</div>';
     if (abvCategory && !isShopifyProfile) {
       html += '<div class="beer-rec-profile-category"><strong>' + abvCategory + '</strong><span>' + ratingCategory + '</span></div>';
@@ -515,7 +562,7 @@ var beerRec = (function() {
     html += '</div></div></div>';
 
     if (recData.recommendations && recData.recommendations.length > 0) {
-      html += '<div class="beer-rec-results"><h3>Recommended For You</h3>';
+      html += '<div class="beer-rec-results"><h3>Aanbevolen Voor Jou</h3>';
       html += '<div class="beer-rec-carousel-container">';
       html += '<button class="beer-rec-carousel-btn prev" onclick="beerRec.scroll(\'recsCarousel\',-1)">&lt;</button>';
       html += '<div class="beer-rec-carousel" id="recsCarousel">';
@@ -524,7 +571,7 @@ var beerRec = (function() {
     }
 
     if (recData.discovery_picks && recData.discovery_picks.length > 0) {
-      html += '<div class="beer-rec-section"><h4>Discovery Picks - Try Something New</h4>';
+      html += '<div class="beer-rec-section"><h4>Ontdek Iets Nieuws</h4>';
       html += '<div class="beer-rec-carousel-container">';
       html += '<button class="beer-rec-carousel-btn prev" onclick="beerRec.scroll(\'discoveryCarousel\',-1)">&lt;</button>';
       html += '<div class="beer-rec-carousel" id="discoveryCarousel">';
@@ -533,7 +580,7 @@ var beerRec = (function() {
     }
 
     if (recData.tried_beers && recData.tried_beers.length > 0) {
-      html += '<div class="beer-rec-section"><h4>Beers You\'ve Tried (In Stock)</h4>';
+      html += '<div class="beer-rec-section"><h4>Bieren Die Je Geprobeerd Hebt (Op Voorraad)</h4>';
       html += '<div class="beer-rec-carousel-container">';
       html += '<button class="beer-rec-carousel-btn prev" onclick="beerRec.scroll(\'triedCarousel\',-1)">&lt;</button>';
       html += '<div class="beer-rec-carousel" id="triedCarousel">';
@@ -552,12 +599,12 @@ var beerRec = (function() {
     var beer = rec.beer;
     var confidenceClass = "beer-rec-confidence-" + rec.confidence;
     var triedClass = (isTried || rec.is_tried) ? "beer-rec-tried" : "";
-    var imageUrl = beer.image_url || "https://via.placeholder.com/150x150?text=No+Image";
+    var imageUrl = beer.image_url || "https://via.placeholder.com/150x200?text=Geen+Afbeelding";
     var variantId = beer.variant_id || "";
 
     var html = '<div class="beer-rec-card ' + confidenceClass + ' ' + triedClass + '">';
-    if (rec.is_tried) html += '<div class="beer-rec-tried-badge">You\'ve tried this!</div>';
-    html += '<img src="' + imageUrl + '" alt="' + beer.title + '" class="beer-rec-card-image" loading="lazy" />';
+    if (rec.is_tried) html += '<div class="beer-rec-tried-badge">Al geprobeerd!</div>';
+    html += '<div class="beer-rec-card-image-wrapper"><img src="' + imageUrl + '" alt="' + beer.title + '" class="beer-rec-card-image" loading="lazy" /></div>';
     html += '<div class="beer-rec-card-body">';
     html += '<h4 class="beer-rec-card-title">' + beer.title + '</h4>';
     html += '<div class="beer-rec-card-brewery">' + beer.vendor + '</div>';
@@ -568,9 +615,9 @@ var beerRec = (function() {
     html += '<div class="beer-rec-card-footer">';
     html += '<span class="beer-rec-price">' + (beer.price ? '€' + parseFloat(beer.price).toFixed(2) : '') + '</span>';
     if (variantId) {
-      html += '<button class="beer-rec-add-btn" onclick="beerRec.addToCart(\'' + variantId + '\', this, event); return false;">Add to Cart</button>';
+      html += '<button class="beer-rec-add-btn" onclick="beerRec.addToCart(\'' + variantId + '\', this, event); return false;">In Winkelwagen</button>';
     } else {
-      html += '<a href="' + (beer.product_url || 'https://houseofbeers.nl/products/' + beer.handle) + '" class="beer-rec-add-btn" target="_blank">View</a>';
+      html += '<a href="' + (beer.product_url || 'https://houseofbeers.nl/products/' + beer.handle) + '" class="beer-rec-add-btn" target="_blank">Bekijken</a>';
     }
     html += '</div></div></div>';
     return html;
@@ -578,14 +625,14 @@ var beerRec = (function() {
 
   function scrollCarousel(carouselId, direction) {
     var carousel = document.getElementById(carouselId);
-    if (carousel) { carousel.scrollBy({ left: 190 * direction, behavior: "smooth" }); }
+    if (carousel) { carousel.scrollBy({ left: 200 * direction, behavior: "smooth" }); }
   }
 
   function addToCart(variantId, btn, evt) {
     if (evt) { evt.preventDefault(); evt.stopPropagation(); }
     if (!variantId) return;
     btn.disabled = true;
-    btn.textContent = "Adding...";
+    btn.textContent = "Toevoegen...";
 
     fetch("/cart/add.js", {
       method: "POST",
@@ -594,14 +641,14 @@ var beerRec = (function() {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      btn.textContent = "Added!";
+      btn.textContent = "Toegevoegd!";
       btn.classList.add("added");
-      showToast("Added to cart: " + data.title);
-      setTimeout(function() { btn.textContent = "Add to Cart"; btn.classList.remove("added"); btn.disabled = false; }, 2000);
+      showToast("Toegevoegd aan winkelwagen: " + data.title);
+      setTimeout(function() { btn.textContent = "In Winkelwagen"; btn.classList.remove("added"); btn.disabled = false; }, 2000);
     })
     .catch(function(e) {
-      btn.textContent = "Error";
-      setTimeout(function() { btn.textContent = "Add to Cart"; btn.disabled = false; }, 2000);
+      btn.textContent = "Fout";
+      setTimeout(function() { btn.textContent = "In Winkelwagen"; btn.disabled = false; }, 2000);
     });
   }
 

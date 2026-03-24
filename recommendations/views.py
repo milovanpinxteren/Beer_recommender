@@ -455,19 +455,9 @@ class TasteProfileView(APIView):
     GET /api/profile/<username>/?type=shopify  (for email-based profiles)
     """
 
-    # Define the axes for the radar chart - these are the main style categories
-    RADAR_AXES = [
-        "IPA",
-        "Stout",
-        "Sour",
-        "Belgian",
-        "Wild/Lambic",
-        "Lager",
-        "Wheat",
-        "Porter",
-        "Barleywine",
-        "Pale Ale",
-    ]
+    # Maximum number of axes to show on radar chart
+    MAX_RADAR_AXES = 8
+    MIN_RADAR_AXES = 3
 
     def get(self, request, username):
         from recommendations.services.untappd_scraper import get_or_create_profile
@@ -532,45 +522,70 @@ class TasteProfileView(APIView):
         })
 
     def _build_radar_data(self, profile_data: dict) -> dict:
-        """Build radar chart data with normalized scores (0-100) for each axis."""
+        """
+        Build radar chart data with normalized scores (0-100) for each axis.
+
+        Only includes styles the user has actually tried, up to MAX_RADAR_AXES.
+        Styles are sorted by a combination of count and rating to show the most
+        relevant styles first.
+        """
         style_counts = profile_data.get("style_counts", {})
         preferred_styles = {
             s["style"]: s for s in profile_data.get("preferred_styles", [])
         }
 
+        # Filter to only styles with count > 0
+        tried_styles = {k: v for k, v in style_counts.items() if v > 0}
+
+        if not tried_styles:
+            return {"axes": [], "values": [], "details": []}
+
         # Find max count for normalization
-        max_count = max(style_counts.values()) if style_counts else 1
+        max_count = max(tried_styles.values())
 
-        axes = []
-        values = []
-        details = []
-
-        for style in self.RADAR_AXES:
-            count = style_counts.get(style, 0)
+        # Calculate scores for all tried styles
+        style_scores = []
+        for style, count in tried_styles.items():
             pref = preferred_styles.get(style, {})
 
-            # Calculate score based on count and rating
-            if count > 0:
-                # Normalize count to 0-70 range
-                count_score = (count / max_count) * 70
-                # Add rating bonus (0-30) if it's a preferred style
-                rating_bonus = 0
-                if pref:
-                    avg_rating = pref.get("avg_rating", 3.0)
-                    rating_bonus = ((avg_rating - 2.5) / 2.5) * 30  # 2.5-5.0 maps to 0-30
+            # Normalize count to 0-70 range
+            count_score = (count / max_count) * 70
 
-                score = min(100, count_score + rating_bonus)
-            else:
-                score = 0
+            # Add rating bonus (0-30) if it's a preferred style
+            rating_bonus = 0
+            if pref:
+                avg_rating = pref.get("avg_rating", 3.0)
+                rating_bonus = ((avg_rating - 2.5) / 2.5) * 30  # 2.5-5.0 maps to 0-30
 
-            axes.append(style)
-            values.append(round(score, 1))
-            details.append({
+            score = min(100, count_score + rating_bonus)
+
+            style_scores.append({
                 "style": style,
                 "count": count,
                 "avg_rating": pref.get("avg_rating") if pref else None,
                 "score": round(score, 1),
+                # Sort key: prioritize styles with both high count and good ratings
+                "sort_key": score + (count * 0.5),
             })
+
+        # Sort by combined score and take top N
+        style_scores.sort(key=lambda x: x["sort_key"], reverse=True)
+        top_styles = style_scores[:self.MAX_RADAR_AXES]
+
+        # Ensure minimum axes for a proper radar chart shape
+        # (with fewer than 3 points it doesn't look like a radar chart)
+        if len(top_styles) < self.MIN_RADAR_AXES:
+            return {"axes": [], "values": [], "details": [], "insufficient_data": True}
+
+        # Build output arrays
+        axes = [s["style"] for s in top_styles]
+        values = [s["score"] for s in top_styles]
+        details = [{
+            "style": s["style"],
+            "count": s["count"],
+            "avg_rating": s["avg_rating"],
+            "score": s["score"],
+        } for s in top_styles]
 
         return {
             "axes": axes,
