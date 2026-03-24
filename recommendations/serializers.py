@@ -77,6 +77,8 @@ class ProfileSummarySerializer(serializers.Serializer):
 class RecommendationResultSerializer(serializers.Serializer):
     """Serializer for complete recommendation response."""
     username = serializers.CharField()
+    display_name = serializers.CharField(required=False, allow_blank=True)
+    profile_type = serializers.CharField(required=False, default='untappd')
     recommendations = RecommendedBeerSerializer(many=True)
     tried_beers = RecommendedBeerSerializer(many=True)
     discovery_picks = RecommendedBeerSerializer(many=True)
@@ -84,10 +86,19 @@ class RecommendationResultSerializer(serializers.Serializer):
 
 
 class RecommendationRequestSerializer(serializers.Serializer):
-    """Serializer for recommendation request parameters."""
+    """
+    Serializer for recommendation request parameters.
+    Accepts either 'username' (Untappd) or 'email' (Shopify customer).
+    """
     username = serializers.CharField(
-        required=True,
+        required=False,
+        allow_blank=True,
         help_text="Untappd username"
+    )
+    email = serializers.EmailField(
+        required=False,
+        allow_blank=True,
+        help_text="Customer email address (for Shopify order-based recommendations)"
     )
     limit = serializers.IntegerField(
         required=False,
@@ -99,7 +110,7 @@ class RecommendationRequestSerializer(serializers.Serializer):
     force_refresh = serializers.BooleanField(
         required=False,
         default=False,
-        help_text="Force re-scrape of user profile"
+        help_text="Force re-fetch of user profile"
     )
     style_filter = serializers.CharField(
         required=False,
@@ -127,6 +138,29 @@ class RecommendationRequestSerializer(serializers.Serializer):
         default=False,
         help_text="Return task ID immediately instead of waiting"
     )
+
+    def validate(self, attrs):
+        """Ensure either username or email is provided, but not both."""
+        username = attrs.get('username', '').strip()
+        email = attrs.get('email', '').strip()
+
+        if not username and not email:
+            raise serializers.ValidationError(
+                "Either 'username' (Untappd) or 'email' (for order history) must be provided."
+            )
+
+        if username and email:
+            raise serializers.ValidationError(
+                "Please provide either 'username' or 'email', not both."
+            )
+
+        # Clean up empty strings
+        if not username:
+            attrs.pop('username', None)
+        if not email:
+            attrs.pop('email', None)
+
+        return attrs
 
 
 class SyncStatusSerializer(serializers.Serializer):

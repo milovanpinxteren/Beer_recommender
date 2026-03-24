@@ -384,7 +384,8 @@ class UntappdProfileScraper:
             return False, "Profile not found"
 
         # Check for private profile indicator
-        private_msg = soup.select_one(".private-user")
+        # Untappd uses both .private-user and .private_user classes
+        private_msg = soup.select_one(".private-user, .private_user")
         if private_msg:
             return False, "Profile is private"
 

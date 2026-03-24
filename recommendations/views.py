@@ -21,15 +21,22 @@ from recommendations.serializers import (
     StyleCategorySerializer,
     ErrorSerializer,
 )
-from recommendations.services.recommendation_engine import get_recommendations_for_user
+from recommendations.services.recommendation_engine import (
+    get_recommendations_for_user,
+    get_recommendations_for_email,
+)
 from recommendations.services.style_mapper import get_all_style_categories, get_all_country_regions
-from recommendations.tasks import generate_recommendations_task
+from recommendations.tasks import generate_recommendations_task, generate_recommendations_email_task
 
 logger = logging.getLogger(__name__)
 
 
 class RecommendationsView(APIView):
-    """Get personalized beer recommendations. Uses async mode when profile needs scraping."""
+    """
+    Get personalized beer recommendations.
+    Supports both Untappd username and Shopify customer email.
+    Uses async mode when profile needs scraping/fetching.
+    """
 
     def post(self, request):
         serializer = RecommendationRequestSerializer(data=request.data)
@@ -40,30 +47,71 @@ class RecommendationsView(APIView):
             )
 
         data = serializer.validated_data
-        username = data["username"]
         force_refresh = data.get("force_refresh", False)
         async_mode = data.get("async_mode", False)
 
+        # Determine if this is username or email based request
+        if data.get("email"):
+            return self._handle_email_request(data, force_refresh, async_mode)
+        else:
+            return self._handle_username_request(data, force_refresh, async_mode)
+
+    def _handle_username_request(self, data, force_refresh, async_mode):
+        """Handle Untappd username-based recommendations."""
+        username = data["username"]
+
         # Check if we have a fresh cached profile
-        has_cached_profile = self._has_valid_cache(username, force_refresh)
+        has_cached_profile = self._has_valid_cache_username(username, force_refresh)
 
         # If no cache or force refresh, use async mode to avoid timeout
         if not has_cached_profile or async_mode:
-            return self._handle_async(data)
+            return self._handle_async_username(data)
 
         # Profile is cached, can respond synchronously
-        return self._handle_sync(data)
+        return self._handle_sync_username(data)
 
-    def _has_valid_cache(self, username, force_refresh):
+    def _handle_email_request(self, data, force_refresh, async_mode):
+        """Handle Shopify email-based recommendations."""
+        email = data["email"].lower().strip()
+
+        # Check if we have a fresh cached profile
+        has_cached_profile = self._has_valid_cache_email(email, force_refresh)
+
+        # If no cache or force refresh, use async mode to avoid timeout
+        if not has_cached_profile or async_mode:
+            return self._handle_async_email(data)
+
+        # Profile is cached, can respond synchronously
+        return self._handle_sync_email(data)
+
+    def _has_valid_cache_username(self, username, force_refresh):
+        """Check if we have a valid cached Untappd profile."""
         if force_refresh:
             return False
         try:
-            cached = CachedUserProfile.objects.get(untappd_username=username)
+            cached = CachedUserProfile.objects.get(
+                untappd_username=username,
+                profile_type='untappd'
+            )
             return cached.is_valid and not cached.is_expired(hours=24)
         except CachedUserProfile.DoesNotExist:
             return False
 
-    def _handle_sync(self, data):
+    def _has_valid_cache_email(self, email, force_refresh):
+        """Check if we have a valid cached Shopify customer profile."""
+        if force_refresh:
+            return False
+        try:
+            cached = CachedUserProfile.objects.get(
+                email=email,
+                profile_type='shopify'
+            )
+            return cached.is_valid and not cached.is_expired(hours=24)
+        except CachedUserProfile.DoesNotExist:
+            return False
+
+    def _handle_sync_username(self, data):
+        """Generate recommendations synchronously for Untappd user."""
         username = data["username"]
         try:
             result = get_recommendations_for_user(
@@ -77,8 +125,22 @@ class RecommendationsView(APIView):
             )
 
             if result is None:
+                # Check cached profile for specific error message
+                error_detail = "Could not find or access Untappd profile"
+                try:
+                    cached = CachedUserProfile.objects.get(
+                        untappd_username=username,
+                        profile_type='untappd'
+                    )
+                    if cached.error_message:
+                        error_detail = cached.error_message
+                        if "private" in error_detail.lower():
+                            error_detail = "This Untappd profile is set to private. The profile needs to be made public in Untappd settings (Privacy → Profile Privacy), or you can try using an email address instead."
+                except CachedUserProfile.DoesNotExist:
+                    pass
+
                 return Response(
-                    {"error": "Profile not found", "detail": "Could not find or access Untappd profile"},
+                    {"error": "Profile not found", "detail": error_detail},
                     status=status.HTTP_404_NOT_FOUND
                 )
 
@@ -92,9 +154,38 @@ class RecommendationsView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-    def _handle_async(self, data):
-        username = data["username"]
+    def _handle_sync_email(self, data):
+        """Generate recommendations synchronously for Shopify customer."""
+        email = data["email"].lower().strip()
+        try:
+            result = get_recommendations_for_email(
+                email=email,
+                limit=data.get("limit", 10),
+                force_refresh=False,
+                style_filter=data.get("style_filter"),
+                country_filter=data.get("country_filter"),
+                price_max=float(data["price_max"]) if data.get("price_max") else None,
+                include_out_of_stock=data.get("include_out_of_stock", False),
+            )
 
+            if result is None:
+                return Response(
+                    {"error": "Customer not found", "detail": "No orders found for this email address"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            response_data = RecommendationResultSerializer(result).data
+            return Response(response_data)
+
+        except Exception as e:
+            logger.exception("Error generating recommendations for email %s", email)
+            return Response(
+                {"error": "Internal error", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _get_filters(self, data):
+        """Extract filter parameters from request data."""
         filters = {}
         if data.get("style_filter"):
             filters["style_filter"] = data["style_filter"]
@@ -104,6 +195,12 @@ class RecommendationsView(APIView):
             filters["price_max"] = float(data["price_max"])
         if data.get("include_out_of_stock"):
             filters["include_out_of_stock"] = data["include_out_of_stock"]
+        return filters
+
+    def _handle_async_username(self, data):
+        """Handle async recommendation generation for Untappd user."""
+        username = data["username"]
+        filters = self._get_filters(data)
 
         task = generate_recommendations_task.delay(
             username=username,
@@ -115,7 +212,27 @@ class RecommendationsView(APIView):
         return Response({
             "status": "pending",
             "task_id": task.id,
-            "message": "Fetching Untappd profile for " + username + ". This may take a minute..."
+            "profile_type": "untappd",
+            "message": f"Fetching Untappd profile for {username}. This may take a minute..."
+        }, status=status.HTTP_202_ACCEPTED)
+
+    def _handle_async_email(self, data):
+        """Handle async recommendation generation for Shopify customer."""
+        email = data["email"].lower().strip()
+        filters = self._get_filters(data)
+
+        task = generate_recommendations_email_task.delay(
+            email=email,
+            limit=data.get("limit", 10),
+            force_refresh=data.get("force_refresh", False),
+            **filters
+        )
+
+        return Response({
+            "status": "pending",
+            "task_id": task.id,
+            "profile_type": "shopify",
+            "message": f"Fetching order history for {email}. This may take a moment..."
         }, status=status.HTTP_202_ACCEPTED)
 
 
@@ -335,6 +452,7 @@ class TasteProfileView(APIView):
 
     GET /api/profile/<username>/
     GET /api/profile/<username>/?force_refresh=true
+    GET /api/profile/<username>/?type=shopify  (for email-based profiles)
     """
 
     # Define the axes for the radar chart - these are the main style categories
@@ -353,16 +471,28 @@ class TasteProfileView(APIView):
 
     def get(self, request, username):
         from recommendations.services.untappd_scraper import get_or_create_profile
+        from recommendations.services.shopify_customer import get_or_create_profile_from_email
 
         force_refresh = request.query_params.get("force_refresh", "").lower() == "true"
+        profile_type = request.query_params.get("type", "untappd").lower()
 
-        profile_data = get_or_create_profile(username, force_refresh=force_refresh)
-
-        if not profile_data:
-            return Response(
-                {"error": "Profile not found or private"},
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Determine which profile fetcher to use
+        if profile_type == "shopify" or "@" in username:
+            # Treat username as email for Shopify profiles
+            email = username.lower().strip()
+            profile_data = get_or_create_profile_from_email(email, force_refresh=force_refresh)
+            if not profile_data:
+                return Response(
+                    {"error": "Customer not found", "detail": "No orders found for this email address"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            profile_data = get_or_create_profile(username, force_refresh=force_refresh)
+            if not profile_data:
+                return Response(
+                    {"error": "Profile not found or private"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
         # Build radar chart data
         radar_data = self._build_radar_data(profile_data)

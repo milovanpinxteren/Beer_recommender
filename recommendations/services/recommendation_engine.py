@@ -34,6 +34,8 @@ class RecommendationResult:
     tried_beers: list  # Beers user has already tried (in our catalog)
     discovery_picks: list  # New styles/breweries to explore
     profile_summary: dict
+    display_name: str = ""  # Human-readable name (for email profiles)
+    profile_type: str = "untappd"  # 'untappd' or 'shopify'
 
 
 class RecommendationEngine:
@@ -398,3 +400,38 @@ def get_recommendations_for_user(
     # Generate recommendations
     engine = RecommendationEngine(profile_data)
     return engine.get_recommendations(limit=limit, **filters)
+
+
+def get_recommendations_for_email(
+    email: str,
+    limit: int = 10,
+    force_refresh: bool = False,
+    **filters
+) -> Optional[RecommendationResult]:
+    """
+    Get recommendations for a customer based on their Shopify order history.
+
+    Args:
+        email: Customer email address
+        limit: Number of recommendations
+        force_refresh: Force re-fetch of order history
+        **filters: Additional filters (style_filter, country_filter, price_max)
+    """
+    from recommendations.services.shopify_customer import get_or_create_profile_from_email
+
+    # Get or build customer profile from order history
+    profile_data = get_or_create_profile_from_email(email, force_refresh=force_refresh)
+
+    if not profile_data:
+        logger.warning(f"Could not get profile for email {email}")
+        return None
+
+    # Generate recommendations using same engine
+    engine = RecommendationEngine(profile_data)
+    result = engine.get_recommendations(limit=limit, **filters)
+
+    # Set profile type info for the frontend
+    result.profile_type = "shopify"
+    result.display_name = profile_data.get("display_name", email)
+
+    return result

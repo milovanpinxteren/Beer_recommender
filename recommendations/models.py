@@ -93,34 +93,69 @@ class Beer(models.Model):
 
 class CachedUserProfile(models.Model):
     """
-    Cached Untappd user profiles to avoid repeated scraping.
+    Cached user profiles to avoid repeated scraping/fetching.
+    Supports both Untappd profiles and Shopify customer order history.
     Expires after 24 hours.
     """
-    untappd_username = models.CharField(max_length=100, unique=True, db_index=True)
-    email = models.EmailField(blank=True, null=True)
-    
+    PROFILE_TYPE_CHOICES = [
+        ('untappd', 'Untappd'),
+        ('shopify', 'Shopify Email'),
+    ]
+
+    untappd_username = models.CharField(max_length=100, db_index=True)
+    email = models.EmailField(blank=True, null=True, db_index=True)
+    profile_type = models.CharField(
+        max_length=20,
+        choices=PROFILE_TYPE_CHOICES,
+        default='untappd',
+        db_index=True
+    )
+
     # Cached profile data (JSON)
     profile_data = models.JSONField(null=True, blank=True)
-    
+
     # Status
-    is_valid = models.BooleanField(default=True)  # False if profile is private
+    is_valid = models.BooleanField(default=True)  # False if profile is private/not found
     error_message = models.CharField(max_length=500, blank=True)
-    
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['-updated_at']
-    
+        # Unique constraint: either untappd_username for untappd type, or email for shopify type
+        constraints = [
+            models.UniqueConstraint(
+                fields=['untappd_username'],
+                condition=models.Q(profile_type='untappd'),
+                name='unique_untappd_username'
+            ),
+            models.UniqueConstraint(
+                fields=['email'],
+                condition=models.Q(profile_type='shopify'),
+                name='unique_shopify_email'
+            ),
+        ]
+
     def __str__(self):
-        return f"{self.untappd_username} ({'valid' if self.is_valid else 'invalid'})"
-    
+        identifier = self.email if self.profile_type == 'shopify' else self.untappd_username
+        return f"{identifier} ({self.profile_type}, {'valid' if self.is_valid else 'invalid'})"
+
     def is_expired(self, hours: int = 24) -> bool:
         """Check if cached profile is older than given hours."""
         from django.utils import timezone
         from datetime import timedelta
         return self.updated_at < timezone.now() - timedelta(hours=hours)
+
+    @property
+    def display_name(self) -> str:
+        """Get a display name for this profile."""
+        if self.profile_type == 'shopify':
+            if self.profile_data and self.profile_data.get('display_name'):
+                return self.profile_data['display_name']
+            return self.email or self.untappd_username
+        return self.untappd_username
 
 
 class SyncLog(models.Model):
