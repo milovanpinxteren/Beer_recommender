@@ -21,17 +21,16 @@ class BeerAdmin(admin.ModelAdmin):
         return custom_urls + urls
 
     def sync_shopify(self, request):
-        from recommendations.services.shopify_sync import run_sync
+        from recommendations.tasks import sync_shopify_catalog
         try:
-            stats = run_sync()
+            task = sync_shopify_catalog.delay()
             messages.success(
                 request,
-                f"Sync completed! Processed: {stats['processed']}, "
-                f"Created: {stats['created']}, Updated: {stats['updated']}, "
-                f"Errors: {len(stats['errors'])}"
+                f"Sync started in background! Task ID: {task.id}. "
+                f"Check the Sync Log for results."
             )
         except Exception as e:
-            messages.error(request, f"Sync failed: {str(e)}")
+            messages.error(request, f"Failed to start sync: {str(e)}")
         return redirect("..")
 
 

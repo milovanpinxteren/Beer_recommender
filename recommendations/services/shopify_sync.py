@@ -194,8 +194,8 @@ class ShopifySyncService:
             as_int=True
         )
 
-        # Build product URL
-        product_url = f"https://{self.domain.replace('.myshopify.com', '.com')}/products/{product['handle']}"
+        # Build product URL - use public store domain
+        product_url = f"https://houseofbeers.nl/products/{product['handle']}"
 
         return {
             "shopify_id": shopify_id,

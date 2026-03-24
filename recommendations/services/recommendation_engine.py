@@ -299,6 +299,9 @@ class RecommendationEngine:
         # Build base queryset - only include active products
         queryset = Beer.objects.filter(is_active=True)
 
+        # Only recommend beers with Untappd data - we need this to make good recommendations
+        queryset = queryset.filter(untappd_rating__isnull=False)
+
         if not include_out_of_stock:
             queryset = queryset.filter(in_stock=True)
 
