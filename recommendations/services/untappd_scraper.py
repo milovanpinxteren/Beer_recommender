@@ -160,6 +160,21 @@ class UntappdProfileScraper:
     BASE_URL = "https://untappd.com"
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
+    # Sort parameters to fetch diverse beer samples
+    # Each sort gives us different beers, helping build a better taste profile
+    SORT_PARAMS = [
+        "date",              # Recent beers (default) - current taste
+        "date_asc",          # Oldest beers - long-term preferences
+        "highest_rated_you", # User's favorites - strong preferences
+        "lowest_rated_you",  # User's least favorites - what to avoid
+        "highest_rated",     # Highly-rated beers globally - quality preferences
+        "lowest_rated",      # Low-rated beers globally - adventurous picks
+        "highest_abv",       # High ABV preferences
+        "lowest_abv",        # Session beer preferences
+        "checkin",           # Most checked-in beers - popular choices
+        "checkin_desc",      # Least checked-in beers - rare/unique finds
+    ]
+
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
@@ -287,9 +302,12 @@ class UntappdProfileScraper:
 
         return stats
 
-    def _fetch_beers_page(self, username: str) -> list:
-        """Fetch beers from user's beers page (first page only due to AJAX limitation)."""
+    def _fetch_beers_page(self, username: str, sort: str = None) -> list:
+        """Fetch beers from user's beers page with optional sort parameter."""
         url = f"{self.BASE_URL}/user/{username}/beers"
+        if sort:
+            url += f"?sort={sort}"
+
         soup = self._make_request(url)
         if not soup:
             return []
@@ -305,10 +323,32 @@ class UntappdProfileScraper:
         return beers
 
     def fetch_user_beers(self, username: str) -> list[CheckIn]:
-        """Fetch beers for a user (limited to first page due to AJAX auth requirement)."""
-        beers = self._fetch_beers_page(username)
-        logger.info(f"Fetched {len(beers)} beers for {username}")
-        return beers
+        """
+        Fetch beers for a user using multiple sort parameters.
+
+        By fetching with different sorts, we get a diverse sample of the user's
+        beer history, giving us a much better picture of their taste profile
+        than just the first page of recent beers.
+        """
+        all_beers = []
+        seen_beer_keys = set()
+
+        for sort_param in self.SORT_PARAMS:
+            beers = self._fetch_beers_page(username, sort=sort_param)
+            new_count = 0
+
+            for beer in beers:
+                # Deduplicate by beer name + brewery
+                beer_key = f"{beer.beer_name}|{beer.brewery}"
+                if beer_key not in seen_beer_keys:
+                    seen_beer_keys.add(beer_key)
+                    all_beers.append(beer)
+                    new_count += 1
+
+            logger.info(f"Fetched {len(beers)} beers with sort={sort_param}, {new_count} new unique")
+
+        logger.info(f"Total fetched for {username}: {len(all_beers)} unique beers from {len(self.SORT_PARAMS)} sort variations")
+        return all_beers
 
     def build_taste_profile(self, username: str) -> UserTasteProfile:
         """Build a complete taste profile from user's beers."""

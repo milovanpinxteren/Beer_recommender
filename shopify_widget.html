@@ -210,7 +210,7 @@ var beerRec = (function() {
   }
 
   function loadSharedProfile(token) {
-    // Token format: type_identifier (e.g., "untappd_craftbeerlover" or "email_hash")
+    // Token format: type_identifier (e.g., "untappd_craftbeerlover" or "email_base64encoded")
     var parts = token.split("_");
     if (parts.length >= 2) {
       var type = parts[0];
@@ -221,8 +221,18 @@ var beerRec = (function() {
         document.getElementById("untappdUsername").value = identifier;
         currentIdentifier = identifier;
         setTimeout(function() { getRecommendations(); }, 500);
+      } else if (type === "email") {
+        // Decode base64 email
+        try {
+          var email = atob(identifier);
+          setInputType("email");
+          document.getElementById("customerEmail").value = email;
+          currentIdentifier = email;
+          setTimeout(function() { getRecommendations(); }, 500);
+        } catch (e) {
+          console.error("Invalid share token", e);
+        }
       }
-      // For email shares, we use a hashed identifier stored on the server
     }
   }
 
@@ -279,12 +289,40 @@ var beerRec = (function() {
     return url.toString();
   }
 
-  function copyShareLink() {
+  function copyShareLink(btn) {
     var shareUrl = getShareUrl();
+    var btnText = btn ? btn.querySelector("span") : null;
+    var originalText = btnText ? btnText.textContent : "";
+
     navigator.clipboard.writeText(shareUrl).then(function() {
-      showToast("Link gekopieerd naar klembord!");
+      // Show success in button
+      if (btnText) {
+        btnText.textContent = "Gekopieerd!";
+        btn.style.background = "rgba(40, 167, 69, 0.4)";
+        setTimeout(function() {
+          btnText.textContent = originalText;
+          btn.style.background = "";
+        }, 2000);
+      }
     }).catch(function() {
-      prompt("Kopieer deze link:", shareUrl);
+      // Fallback: show URL in a simple text input for manual copy
+      if (btnText) {
+        btnText.textContent = "Kopieer URL hieronder";
+        btn.style.background = "rgba(255, 193, 7, 0.4)";
+      }
+      // Create a temporary input after the button
+      var input = document.createElement("input");
+      input.type = "text";
+      input.value = shareUrl;
+      input.style.cssText = "width:100%;padding:8px;margin-top:10px;border-radius:4px;border:1px solid #ccc;font-size:12px;";
+      input.readOnly = true;
+      input.onclick = function() { this.select(); };
+      var container = btn.parentElement;
+      var existing = container.querySelector(".share-url-input");
+      if (existing) existing.remove();
+      input.className = "share-url-input";
+      container.appendChild(input);
+      input.select();
     });
   }
 
@@ -499,7 +537,7 @@ var beerRec = (function() {
       ctx.stroke();
     }
 
-    // Draw labels with count
+    // Draw labels (style names only)
     ctx.fillStyle = "rgba(255,255,255,1)";
     ctx.font = "bold 12px sans-serif";
     ctx.textAlign = "center";
@@ -512,12 +550,9 @@ var beerRec = (function() {
       var y = centerY + labelRadius * Math.sin(angle);
 
       var label = axes[i] || "";
-      var detail = details[i];
-      var countLabel = detail ? " (" + detail.count + ")" : "";
-
       // Truncate long labels
-      if (label.length > 10) label = label.substring(0, 8) + "..";
-      ctx.fillText(label + countLabel, x, y);
+      if (label.length > 12) label = label.substring(0, 10) + "..";
+      ctx.fillText(label, x, y);
     }
   }
 
@@ -544,7 +579,7 @@ var beerRec = (function() {
     var ratingLabel = isShopifyProfile ? "Kwaliteitsscore" : "Gem. Beoordeling";
 
     // Share button always available
-    var shareBtn = '<button class="beer-rec-share-btn" onclick="beerRec.copyShareLink()" title="Deel je aanbevelingen"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path></svg>Delen</button>';
+    var shareBtn = '<button class="beer-rec-share-btn" id="shareBtn" onclick="beerRec.copyShareLink(this)" title="Deel je aanbevelingen"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z"></path></svg><span>Delen</span></button>';
 
     var html = '<div class="beer-rec-profile"><h3>Jouw Smaakprofiel ' + shareBtn + '</h3><div class="beer-rec-profile-content">';
     html += '<div class="beer-rec-radar-container"><canvas id="' + canvasId + '" class="beer-rec-radar-canvas" width="350" height="350"></canvas></div>';
