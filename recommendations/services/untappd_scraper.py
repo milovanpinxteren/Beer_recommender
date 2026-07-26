@@ -186,8 +186,19 @@ class UntappdProfileScraper:
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": self.USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Ch-Ua": '"Chromium";v="137", "Not=A?Brand";v="24", "Google Chrome";v="137"',
+            "Sec-Ch-Ua-Mobile": "?0",
+            "Sec-Ch-Ua-Platform": '"Windows"',
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Cache-Control": "max-age=0",
         })
         self.request_delay = getattr(settings, "UNTAPPD_REQUEST_DELAY", 3.0)
         self.max_checkins = getattr(settings, "UNTAPPD_MAX_CHECKINS", 500)
