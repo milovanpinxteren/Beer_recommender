@@ -158,7 +158,10 @@ class UntappdProfileScraper:
     """Scrapes Untappd user profiles to build taste profiles."""
 
     BASE_URL = "https://untappd.com"
-    USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    USER_AGENT = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+    )
 
     # Sort parameters to fetch diverse beer samples
     # Each sort gives us different beers, helping build a better taste profile
@@ -175,6 +178,10 @@ class UntappdProfileScraper:
         "checkin_desc",      # Least checked-in beers - rare/unique finds
     ]
 
+    # Retry settings for transient errors
+    MAX_RETRIES = 3
+    RETRY_BACKOFF = [5, 15, 30]
+
     def __init__(self):
         self.session = requests.Session()
         self.session.headers.update({
@@ -182,23 +189,48 @@ class UntappdProfileScraper:
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         })
-        self.request_delay = getattr(settings, "UNTAPPD_REQUEST_DELAY", 1.5)
+        self.request_delay = getattr(settings, "UNTAPPD_REQUEST_DELAY", 3.0)
         self.max_checkins = getattr(settings, "UNTAPPD_MAX_CHECKINS", 500)
 
+    def _is_retryable(self, status_code: int = None, error: str = None) -> bool:
+        """Check if an error is transient and worth retrying."""
+        if status_code and status_code in (429, 500, 502, 503, 504):
+            return True
+        if error:
+            retryable = ['timed out', 'timeout', 'connection']
+            return any(r in error.lower() for r in retryable)
+        return False
+
     def _make_request(self, url: str) -> Optional[BeautifulSoup]:
-        """Make a rate-limited request and return parsed HTML."""
+        """Make a rate-limited request with retry logic and return parsed HTML."""
         time.sleep(self.request_delay)
 
-        try:
-            response = self.session.get(url, timeout=15)
-            if response.status_code == 404:
-                logger.warning(f"User not found: {url}")
+        for attempt in range(self.MAX_RETRIES + 1):
+            try:
+                response = self.session.get(url, timeout=15)
+                if response.status_code == 404:
+                    logger.warning(f"User not found: {url}")
+                    return None
+                if self._is_retryable(status_code=response.status_code):
+                    if attempt < self.MAX_RETRIES:
+                        wait = self.RETRY_BACKOFF[attempt]
+                        logger.info(f"Retrying {url} in {wait}s (HTTP {response.status_code}, attempt {attempt + 1})")
+                        time.sleep(wait)
+                        continue
+                response.raise_for_status()
+                return BeautifulSoup(response.text, "html.parser")
+            except requests.RequestException as e:
+                error_str = str(e)
+                if self._is_retryable(error=error_str) and attempt < self.MAX_RETRIES:
+                    wait = self.RETRY_BACKOFF[attempt]
+                    logger.info(f"Retrying {url} in {wait}s ({error_str}, attempt {attempt + 1})")
+                    time.sleep(wait)
+                    continue
+                logger.error(f"Request failed for {url}: {e}")
                 return None
-            response.raise_for_status()
-            return BeautifulSoup(response.text, "html.parser")
-        except requests.RequestException as e:
-            logger.error(f"Request failed for {url}: {e}")
-            return None
+
+        logger.error(f"All retries exhausted for {url}")
+        return None
 
     def _parse_beer_item(self, item) -> Optional[CheckIn]:
         """Parse a single beer item from the /beers page."""
