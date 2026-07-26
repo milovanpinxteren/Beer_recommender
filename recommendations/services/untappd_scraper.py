@@ -479,7 +479,8 @@ def get_or_create_profile(username: str, force_refresh: bool = False) -> Optiona
             logger.info(f"Using cached profile for {username}")
             return cached.profile_data
 
-        if not cached.is_valid:
+        # Retry invalid profiles when cache is expired (scraper may have been fixed)
+        if not cached.is_valid and not cached.is_expired() and not force_refresh:
             logger.warning(f"Cached profile for {username} is invalid: {cached.error_message}")
             return None
 
