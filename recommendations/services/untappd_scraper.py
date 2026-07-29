@@ -154,6 +154,19 @@ class UserTasteProfile:
         }
 
 
+def _get_api_client():
+    """
+    Return a configured Untappd API client, or None to fall back to scraping.
+
+    Kept as a function so credentials can be added via env vars without any
+    code change — the API path activates as soon as they are present.
+    """
+    from recommendations.services.untappd_api import UntappdAPIClient
+
+    client = UntappdAPIClient()
+    return client if client.is_configured() else None
+
+
 class UntappdProfileScraper:
     """Scrapes Untappd user profiles to build taste profiles."""
 
@@ -184,21 +197,22 @@ class UntappdProfileScraper:
 
     def __init__(self):
         self.session = requests.Session()
+        # Deliberately minimal — this is the header set the rating sync in the
+        # WhatsApp app uses successfully against Untappd.
+        #
+        # The previous version sent a full browser impersonation (Sec-Ch-Ua,
+        # Sec-Fetch-*, Upgrade-Insecure-Requests, ...). Claiming to be Chrome
+        # 137 in the headers while presenting Python's TLS fingerprint is a
+        # mismatch anti-bot filtering keys on, and it bought nothing.
+        #
+        # Critically, it also advertised `Accept-Encoding: ...,br` while the
+        # `brotli` package is not installed, so every response came back as
+        # undecodable bytes and silently parsed to zero results. Leaving
+        # Accept-Encoding unset lets requests advertise only what it can decode.
         self.session.headers.update({
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
             "User-Agent": self.USER_AGENT,
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Upgrade-Insecure-Requests": "1",
-            "Sec-Ch-Ua": '"Chromium";v="137", "Not=A?Brand";v="24", "Google Chrome";v="137"',
-            "Sec-Ch-Ua-Mobile": "?0",
-            "Sec-Ch-Ua-Platform": '"Windows"',
-            "Sec-Fetch-Dest": "document",
-            "Sec-Fetch-Mode": "navigate",
-            "Sec-Fetch-Site": "none",
-            "Sec-Fetch-User": "?1",
-            "Cache-Control": "max-age=0",
         })
         self.request_delay = getattr(settings, "UNTAPPD_REQUEST_DELAY", 3.0)
         self.max_checkins = getattr(settings, "UNTAPPD_MAX_CHECKINS", 500)
@@ -397,11 +411,23 @@ class UntappdProfileScraper:
         """Build a complete taste profile from user's beers."""
         from recommendations.services.style_mapper import get_style_category
 
-        # Get actual stats from profile page
+        # Get actual stats from profile page (still public)
         stats = self._fetch_profile_stats(username)
 
-        # Get beer samples from beers page
-        checkins = self.fetch_user_beers(username)
+        # Prefer the official API: Untappd made /user/<name>/beers login-only,
+        # so scraping it returns nothing. Fall back to scraping only so older
+        # deployments without API credentials behave as before.
+        checkins = []
+        api = _get_api_client()
+        if api is not None:
+            checkins = api.get_user_beers(username)
+            total = api.get_user_total_count(username)
+            if total:
+                stats["unique_beers"] = total
+                if not stats.get("total_checkins"):
+                    stats["total_checkins"] = total
+        else:
+            checkins = self.fetch_user_beers(username)
 
         profile = UserTasteProfile(username=username)
         # Use actual stats from profile, not scraped sample count
@@ -460,6 +486,10 @@ class UntappdProfileScraper:
 
     def check_profile_exists(self, username: str) -> tuple[bool, str]:
         """Check if a profile exists and is public."""
+        api = _get_api_client()
+        if api is not None:
+            return api.check_user_exists(username)
+
         url = f"{self.BASE_URL}/user/{username}"
         soup = self._make_request(url)
 
@@ -498,11 +528,23 @@ def get_or_create_profile(username: str, force_refresh: bool = False) -> Optiona
     except CachedUserProfile.DoesNotExist:
         cached = None
 
-    # Scrape fresh profile
+    # Build a fresh profile (via the API when configured, else scraping)
     scraper = UntappdProfileScraper()
 
+    from recommendations.services.untappd_api import UntappdAPIError
+
     # Check profile exists first
-    exists, message = scraper.check_profile_exists(username)
+    try:
+        exists, message = scraper.check_profile_exists(username)
+    except UntappdAPIError as e:
+        # A rate limit (or transient API failure) says nothing about whether the
+        # profile is real. Caching it as invalid would lock the user out until
+        # the entry expires, so serve stale data if we have it and retry later.
+        logger.warning(f"Untappd API unavailable for {username}: {e}")
+        if cached and cached.is_valid and cached.profile_data:
+            return cached.profile_data
+        return None
+
     if not exists:
         if cached:
             cached.is_valid = False
@@ -520,6 +562,25 @@ def get_or_create_profile(username: str, force_refresh: bool = False) -> Optiona
     try:
         profile = scraper.build_taste_profile(username)
         profile_data = profile.to_dict()
+
+        # No beers is a failure, not an empty profile. Caching it as valid hides
+        # the breakage for the whole cache TTL and serves an empty taste wheel
+        # with no error anywhere — which is exactly how this broke silently.
+        if not profile_data.get("tried_beers"):
+            if _get_api_client() is None:
+                message = (
+                    "No beers returned. Untappd requires a login for user beer "
+                    "lists, so scraping cannot work — set UNTAPPD_CLIENT_ID and "
+                    "UNTAPPD_CLIENT_SECRET to use the official API."
+                )
+            else:
+                message = "Untappd API returned no beers for this profile"
+            logger.error(f"Empty profile for {username}: {message}")
+            CachedUserProfile.objects.update_or_create(
+                untappd_username=username,
+                defaults={"is_valid": False, "error_message": message},
+            )
+            return None
 
         # Update or create cache entry
         CachedUserProfile.objects.update_or_create(

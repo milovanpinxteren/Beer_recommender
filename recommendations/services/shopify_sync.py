@@ -44,7 +44,7 @@ class ShopifySyncService:
                     featuredImage {
                         url
                     }
-                    metafields(first: 20) {
+                    metafields(first: 50) {
                         edges {
                             node {
                                 namespace
@@ -126,12 +126,25 @@ class ShopifySyncService:
         return metafields
 
     def _parse_rating_value(self, value: str) -> Optional[float]:
-        """Parse rating metafield JSON value."""
+        """
+        Parse an Untappd rating metafield value.
+
+        Two formats occur in the store: a plain decimal string ("4.37", written
+        by the nightly rating sync as a number_decimal metafield) and a legacy
+        JSON object ({"value": 4.37}). Accept both.
+        """
         import json
+        if value is None:
+            return None
         try:
             data = json.loads(value)
-            return float(data.get("value", 0))
-        except (json.JSONDecodeError, TypeError, ValueError):
+        except (json.JSONDecodeError, TypeError):
+            data = value
+        if isinstance(data, dict):
+            data = data.get("value")
+        try:
+            return float(data)
+        except (TypeError, ValueError):
             return None
 
     def _extract_numeric(self, value: str, as_int: bool = False) -> Optional[float | int]:
@@ -183,9 +196,13 @@ class ShopifySyncService:
             as_int=True
         )
 
-        # Untappd rating (special JSON format)
+        # Untappd rating. The nightly sync writes custom.untappd_rating;
+        # custom.untappd_score is the older key, kept as a fallback.
         untappd_rating = None
-        rating_raw = metafields.get("custom.untappd_score", {}).get("value")
+        rating_raw = (
+            metafields.get("custom.untappd_rating", {}).get("value")
+            or metafields.get("custom.untappd_score", {}).get("value")
+        )
         if rating_raw:
             untappd_rating = self._parse_rating_value(rating_raw)
 

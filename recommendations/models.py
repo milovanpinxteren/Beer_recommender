@@ -142,10 +142,21 @@ class CachedUserProfile(models.Model):
         identifier = self.email if self.profile_type == 'shopify' else self.untappd_username
         return f"{identifier} ({self.profile_type}, {'valid' if self.is_valid else 'invalid'})"
 
-    def is_expired(self, hours: int = 24) -> bool:
-        """Check if cached profile is older than given hours."""
+    def is_expired(self, hours: int = None) -> bool:
+        """
+        Check if cached profile is older than given hours.
+
+        Defaults to UNTAPPD_PROFILE_CACHE_HOURS. This matters operationally:
+        the Untappd API allows only 100 calls/hour and a profile costs several
+        calls, so a short TTL across many linked users exhausts the budget.
+        Taste profiles change slowly, so a long TTL is appropriate.
+        """
+        from django.conf import settings
         from django.utils import timezone
         from datetime import timedelta
+
+        if hours is None:
+            hours = getattr(settings, 'UNTAPPD_PROFILE_CACHE_HOURS', 168)
         return self.updated_at < timezone.now() - timedelta(hours=hours)
 
     @property

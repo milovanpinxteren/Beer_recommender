@@ -121,6 +121,23 @@ SHOPIFY_API_VERSION = '2024-10'
 UNTAPPD_REQUEST_DELAY = 1.5  # seconds between requests
 UNTAPPD_MAX_CHECKINS = 3000  # max checkins to analyze per user
 
+# Untappd API (https://untappd.com/api/docs#userbeers)
+# Untappd made /user/<name>/beers login-only, so user beer lists can no longer
+# be scraped. The official API returns the same data using only application
+# credentials — no per-user OAuth — so users still just supply a username.
+# When these are set, profile building automatically uses the API instead of
+# scraping. Register an app at https://untappd.com/api/register?register=new
+UNTAPPD_CLIENT_ID = os.getenv('UNTAPPD_CLIENT_ID', '')
+UNTAPPD_CLIENT_SECRET = os.getenv('UNTAPPD_CLIENT_SECRET', '')
+UNTAPPD_API_TIMEOUT = int(os.getenv('UNTAPPD_API_TIMEOUT', '15'))
+# Beers pulled per profile. The API allows 50/call and 100 calls/hour, so this
+# costs ceil(N/50) calls per user — 300 = 6 calls, i.e. ~16 profiles per hour.
+UNTAPPD_API_MAX_BEERS = int(os.getenv('UNTAPPD_API_MAX_BEERS', '300'))
+# How long a built taste profile stays fresh. Kept long (7 days) because the
+# API budget is 100 calls/hour: at 6 calls per profile, a 24h TTL across a few
+# hundred linked users would exhaust the quota every day.
+UNTAPPD_PROFILE_CACHE_HOURS = int(os.getenv('UNTAPPD_PROFILE_CACHE_HOURS', '168'))
+
 # Celery Configuration
 CELERY_BROKER_URL = os.getenv('REDIS_URL') or f"sqla+{os.getenv('DATABASE_URL', 'sqlite:///db.sqlite3')}"
 CELERY_RESULT_BACKEND = 'django-db'
