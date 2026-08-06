@@ -5,6 +5,7 @@ URL configuration for recommendations API.
 from django.urls import path
 from recommendations.views import (
     RecommendationsView,
+    SixpackView,
     TaskStatusView,
     BeerListView,
     BeerDetailView,
@@ -22,6 +23,9 @@ urlpatterns = [
 
     # Recommendations
     path("recommendations/", RecommendationsView.as_view(), name="recommendations"),
+
+    # Personalized sixpack generator
+    path("sixpack/", SixpackView.as_view(), name="sixpack"),
 
     # Task status (for async recommendations)
     path("tasks/<str:task_id>/", TaskStatusView.as_view(), name="task_status"),

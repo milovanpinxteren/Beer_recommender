@@ -18,6 +18,7 @@ class BeerSerializer(serializers.ModelSerializer):
             "handle",
             "title",
             "vendor",
+            "merk",
             "price",
             "product_url",
             "image_url",
@@ -27,6 +28,8 @@ class BeerSerializer(serializers.ModelSerializer):
             "untappd_style",
             "country",
             "year",
+            "rijpingsmethode",
+            "inhoud",
             "untappd_url",
             "untappd_rating",
             "untappd_rating_count",
@@ -161,6 +164,80 @@ class RecommendationRequestSerializer(serializers.Serializer):
             attrs.pop('email', None)
 
         return attrs
+
+
+class SixpackLockedSlotSerializer(serializers.Serializer):
+    """A locked slot the client wants to keep during a re-spin."""
+    shopify_id = serializers.CharField()
+    role = serializers.ChoiceField(choices=["safe", "adjacent", "wildcard"])
+
+
+class SixpackRequestSerializer(serializers.Serializer):
+    """Request parameters for the sixpack generator."""
+    username = serializers.CharField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    budget = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=20, max_value=250
+    )
+    exclude_style_categories = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    include_alcohol_free = serializers.BooleanField(required=False, default=False)
+    adventurousness = serializers.ChoiceField(
+        choices=["safe", "balanced", "adventurous"], required=False, default="balanced"
+    )
+    max_abv = serializers.FloatField(required=False, allow_null=True)
+    locked = SixpackLockedSlotSerializer(many=True, required=False, default=list)
+    exclude = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    force_refresh = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, attrs):
+        username = attrs.get('username', '').strip()
+        email = attrs.get('email', '').strip()
+
+        if not username and not email:
+            raise serializers.ValidationError(
+                "Either 'username' (Untappd) or 'email' (for order history) must be provided."
+            )
+        if username and email:
+            raise serializers.ValidationError(
+                "Please provide either 'username' or 'email', not both."
+            )
+        if not username:
+            attrs.pop('username', None)
+        if not email:
+            attrs.pop('email', None)
+
+        locked = attrs.get('locked') or []
+        if len(locked) > 5:
+            raise serializers.ValidationError("At most 5 slots can be locked.")
+        locked_ids = {item['shopify_id'] for item in locked}
+        if locked_ids & set(attrs.get('exclude') or []):
+            raise serializers.ValidationError(
+                "Locked beers cannot also be in the exclude list."
+            )
+
+        return attrs
+
+
+class SixpackSlotSerializer(serializers.Serializer):
+    """One slot in a generated sixpack."""
+    position = serializers.IntegerField()
+    role = serializers.CharField()
+    locked = serializers.BooleanField()
+    beer = BeerSerializer()
+    reasons = serializers.ListField(child=serializers.DictField())
+
+
+class SixpackResultSerializer(serializers.Serializer):
+    """Complete sixpack response."""
+    profile_type = serializers.CharField()
+    slots = SixpackSlotSerializer(many=True)
+    pack_value = serializers.DecimalField(max_digits=10, decimal_places=2)
+    budget = serializers.DecimalField(max_digits=10, decimal_places=2)
+    within_budget = serializers.BooleanField()
 
 
 class SyncStatusSerializer(serializers.Serializer):

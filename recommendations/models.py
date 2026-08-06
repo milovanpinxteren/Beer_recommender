@@ -13,7 +13,9 @@ class Beer(models.Model):
     
     # Basic product info
     title = models.CharField(max_length=500)
-    vendor = models.CharField(max_length=255, blank=True)  # merk/brewery
+    vendor = models.CharField(max_length=255, blank=True)  # Shopify vendor (usually the shop itself)
+    merk = models.CharField(max_length=255, blank=True)  # actual brewery, from custom.merk
+    product_type = models.CharField(max_length=100, blank=True)  # Shopify productType (Beer/Auction/Fee/...)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     product_url = models.CharField(max_length=500, blank=True)
     image_url = models.URLField(max_length=1000, blank=True)
@@ -25,6 +27,8 @@ class Beer(models.Model):
     untappd_style = models.CharField(max_length=200, blank=True)  # untappd_style (detailed)
     country = models.CharField(max_length=100, blank=True, db_index=True)  # land_van_herkomst
     year = models.IntegerField(null=True, blank=True)  # brouwjaar
+    rijpingsmethode = models.CharField(max_length=255, blank=True)  # barrel aging method
+    inhoud = models.CharField(max_length=50, blank=True)  # volume, e.g. "33cl"
     
     # Untappd data
     untappd_url = models.URLField(max_length=500, blank=True)

@@ -157,6 +157,23 @@ class ShopifySyncService:
         except (TypeError, ValueError):
             return None
 
+    def _parse_text_value(self, value: str) -> str:
+        """
+        Parse a text metafield value. List-typed metafields
+        (list.single_line_text_field) arrive as a JSON array string.
+        """
+        import json
+        if not value:
+            return ""
+        if value.startswith("["):
+            try:
+                data = json.loads(value)
+                if isinstance(data, list):
+                    return ", ".join(str(v) for v in data)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return value
+
     def _parse_link_value(self, value: str) -> str:
         """Parse link metafield JSON value to extract URL."""
         import json
@@ -228,6 +245,16 @@ class ShopifySyncService:
             "untappd_style": metafields.get("custom.untappd_style", {}).get("value", ""),
             "country": metafields.get("custom.land_van_herkomst", {}).get("value", ""),
             "year": year,
+            "rijpingsmethode": self._parse_text_value(
+                metafields.get("custom.rijpingsmethode", {}).get("value", "")
+            )[:255],
+            "inhoud": self._parse_text_value(
+                metafields.get("custom.inhoud", {}).get("value", "")
+            )[:50],
+            "merk": self._parse_text_value(
+                metafields.get("custom.merk", {}).get("value", "")
+            )[:255],
+            "product_type": (product.get("productType") or "").strip()[:100],
             "untappd_url": self._parse_link_value(metafields.get("custom.untappd_link", {}).get("value", "")),
             "untappd_rating": untappd_rating,
             "untappd_rating_count": untappd_rating_count,

@@ -110,6 +110,49 @@ def generate_recommendations_task(self, username: str, limit: int = 10,
 
 
 @shared_task(bind=True, max_retries=2)
+def generate_sixpack_task(self, identifier_type: str, identifier: str,
+                          params: dict, force_refresh: bool = False):
+    """
+    Build a personalized sixpack in the background (cold profile path).
+    identifier_type: 'untappd' or 'email'.
+    Result flows through the existing TaskStatusView.
+    """
+    from recommendations.services.sixpack_engine import (
+        get_sixpack_for_user, get_sixpack_for_email, SixpackError,
+    )
+    from recommendations.serializers import SixpackResultSerializer
+
+    logger.info(f"Generating sixpack for {identifier_type} {identifier}...")
+
+    try:
+        if identifier_type == 'email':
+            result = get_sixpack_for_email(
+                identifier.lower().strip(), params, force_refresh=force_refresh
+            )
+        else:
+            result = get_sixpack_for_user(
+                identifier, params, force_refresh=force_refresh
+            )
+
+        if result is None:
+            return {
+                "success": False,
+                "error": "Profile not found or has no order history",
+            }
+
+        return {
+            "success": True,
+            "result": SixpackResultSerializer(result).data,
+        }
+
+    except SixpackError as e:
+        return {"success": False, "error": str(e)}
+    except Exception as e:
+        logger.error(f"Sixpack generation failed for {identifier}: {e}")
+        raise self.retry(exc=e, countdown=30 * (2 ** self.request.retries))
+
+
+@shared_task(bind=True, max_retries=2)
 def generate_recommendations_email_task(self, email: str, limit: int = 10,
                                          force_refresh: bool = False, **filters):
     """

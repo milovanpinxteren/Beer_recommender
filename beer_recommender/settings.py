@@ -112,6 +112,10 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all in development
 
+# Optional shared secret for server-to-server calls (sixpack endpoint).
+# When unset, the endpoint stays open like the rest of the API.
+RECOMMENDER_API_KEY = os.getenv('RECOMMENDER_API_KEY', '')
+
 # Shopify Configuration
 SHOPIFY_DOMAIN = os.getenv('SHOPIFY_DOMAIN')
 SHOPIFY_ACCESS_TOKEN = os.getenv('SHOPIFY_ACCESS_TOKEN')

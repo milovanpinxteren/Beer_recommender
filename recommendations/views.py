@@ -31,6 +31,65 @@ from recommendations.tasks import generate_recommendations_task, generate_recomm
 logger = logging.getLogger(__name__)
 
 
+def has_valid_cache_username(username, force_refresh=False):
+    """Check if a fresh, valid cached Untappd profile exists."""
+    if force_refresh:
+        return False
+    try:
+        cached = CachedUserProfile.objects.get(
+            untappd_username=username,
+            profile_type='untappd'
+        )
+        return cached.is_valid and not cached.is_expired(hours=24)
+    except CachedUserProfile.DoesNotExist:
+        return False
+
+
+def has_fresh_invalid_cache_username(username):
+    """
+    True when a fresh cached profile says this Untappd user can't be built
+    (private/blocked/not found). Dispatching a build task would just fail
+    against the same cache entry, so callers can 404 immediately.
+    """
+    try:
+        cached = CachedUserProfile.objects.get(
+            untappd_username=username,
+            profile_type='untappd'
+        )
+        return not cached.is_valid and not cached.is_expired()
+    except CachedUserProfile.DoesNotExist:
+        return False
+
+
+def has_fresh_invalid_cache_email(email):
+    """
+    True when a fresh cached profile says this customer can't be built
+    (not in Shopify / no orders). Callers can 404 without dispatching a task.
+    """
+    try:
+        cached = CachedUserProfile.objects.get(
+            email=email,
+            profile_type='shopify'
+        )
+        return not cached.is_valid and not cached.is_expired()
+    except CachedUserProfile.DoesNotExist:
+        return False
+
+
+def has_valid_cache_email(email, force_refresh=False):
+    """Check if a fresh, valid cached Shopify customer profile exists."""
+    if force_refresh:
+        return False
+    try:
+        cached = CachedUserProfile.objects.get(
+            email=email,
+            profile_type='shopify'
+        )
+        return cached.is_valid and not cached.is_expired(hours=24)
+    except CachedUserProfile.DoesNotExist:
+        return False
+
+
 class RecommendationsView(APIView):
     """
     Get personalized beer recommendations.
@@ -85,30 +144,10 @@ class RecommendationsView(APIView):
         return self._handle_sync_email(data)
 
     def _has_valid_cache_username(self, username, force_refresh):
-        """Check if we have a valid cached Untappd profile."""
-        if force_refresh:
-            return False
-        try:
-            cached = CachedUserProfile.objects.get(
-                untappd_username=username,
-                profile_type='untappd'
-            )
-            return cached.is_valid and not cached.is_expired(hours=24)
-        except CachedUserProfile.DoesNotExist:
-            return False
+        return has_valid_cache_username(username, force_refresh)
 
     def _has_valid_cache_email(self, email, force_refresh):
-        """Check if we have a valid cached Shopify customer profile."""
-        if force_refresh:
-            return False
-        try:
-            cached = CachedUserProfile.objects.get(
-                email=email,
-                profile_type='shopify'
-            )
-            return cached.is_valid and not cached.is_expired(hours=24)
-        except CachedUserProfile.DoesNotExist:
-            return False
+        return has_valid_cache_email(email, force_refresh)
 
     def _handle_sync_username(self, data):
         """Generate recommendations synchronously for Untappd user."""
@@ -234,6 +273,119 @@ class RecommendationsView(APIView):
             "profile_type": "shopify",
             "message": f"Fetching order history for {email}. This may take a moment..."
         }, status=status.HTTP_202_ACCEPTED)
+
+
+class SixpackView(APIView):
+    """
+    Build a personalized sixpack.
+
+    POST /api/sixpack/
+    Body: {email|username, budget, exclude_style_categories, include_alcohol_free,
+           adventurousness, max_abv?, locked: [{shopify_id, role}], exclude: [ids]}
+    Returns 200 with the pack when the profile is cached, 202 {status, task_id}
+    when it must be built first (poll GET /api/tasks/<task_id>/).
+    """
+
+    def post(self, request):
+        from django.conf import settings
+        from recommendations.serializers import (
+            SixpackRequestSerializer, SixpackResultSerializer,
+        )
+        from recommendations.services.sixpack_engine import (
+            get_sixpack_for_user, get_sixpack_for_email, SixpackError,
+        )
+        from recommendations.tasks import generate_sixpack_task
+
+        api_key = getattr(settings, 'RECOMMENDER_API_KEY', '')
+        if api_key and request.headers.get('X-Recommender-Key') != api_key:
+            return Response({"error": "Forbidden"}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = SixpackRequestSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"error": "Invalid request", "detail": serializer.errors},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        data = serializer.validated_data
+        force_refresh = data.get("force_refresh", False)
+        params = {
+            "budget": float(data["budget"]),
+            "adventurousness": data.get("adventurousness", "balanced"),
+            "exclude_style_categories": data.get("exclude_style_categories", []),
+            "include_alcohol_free": data.get("include_alcohol_free", False),
+            "max_abv": data.get("max_abv"),
+            "locked": data.get("locked", []),
+            "exclude": data.get("exclude", []),
+        }
+
+        if data.get("email"):
+            identifier_type = "email"
+            identifier = data["email"].lower().strip()
+            profile_type = "shopify"
+            # Known-unbuildable customer (not in Shopify / no orders): fail
+            # fast instead of dispatching a doomed build task.
+            if not force_refresh and has_fresh_invalid_cache_email(identifier):
+                return Response(
+                    {"error": "Customer not found",
+                     "detail": "No orders found for this email address"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            cached = has_valid_cache_email(identifier, force_refresh)
+        else:
+            identifier_type = "untappd"
+            identifier = data["username"]
+            profile_type = "untappd"
+            # Known-unbuildable profile: fail fast instead of dispatching a
+            # doomed build task, so callers can fall back within one request.
+            if not force_refresh and has_fresh_invalid_cache_username(identifier):
+                return Response(
+                    {"error": "Profile not found",
+                     "detail": "Untappd profile could not be built."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            cached = has_valid_cache_username(identifier, force_refresh)
+
+        if not cached:
+            task = generate_sixpack_task.delay(
+                identifier_type=identifier_type,
+                identifier=identifier,
+                params=params,
+                force_refresh=force_refresh,
+            )
+            return Response({
+                "status": "pending",
+                "task_id": task.id,
+                "profile_type": profile_type,
+                "message": "Building your taste profile. This may take a moment...",
+            }, status=status.HTTP_202_ACCEPTED)
+
+        try:
+            if identifier_type == "email":
+                result = get_sixpack_for_email(identifier, params)
+            else:
+                result = get_sixpack_for_user(identifier, params)
+
+            if result is None:
+                return Response(
+                    {"error": "Profile not found",
+                     "detail": "No profile or order history found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            return Response(SixpackResultSerializer(result).data)
+
+        except SixpackError as e:
+            return Response(
+                {"error": "not_enough_beers", "detail": str(e)},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY
+            )
+        except Exception as e:
+            logger.exception("Error generating sixpack for %s", identifier)
+            return Response(
+                {"error": "Internal error", "detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class TaskStatusView(APIView):
