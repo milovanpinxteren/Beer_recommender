@@ -66,6 +66,13 @@ class Beer(models.Model):
         self.style_category = self.compute_style_category()
         self.country_region = self.compute_country_region()
         self.price_bucket = self.compute_price_bucket()
+        # Since Django 5.0, update_or_create() passes update_fields to save();
+        # widen it so the recomputed derived fields are actually persisted.
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            kwargs["update_fields"] = set(update_fields) | {
+                "style_category", "country_region", "price_bucket",
+            }
         super().save(*args, **kwargs)
     
     def compute_style_category(self) -> str:
