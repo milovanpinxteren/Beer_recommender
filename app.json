@@ -36,5 +36,15 @@
       "required": true
     }
   },
-  "addons": ["postgresql:hobby-basic"]
+  "addons": ["postgresql:hobby-basic"],
+  "cron": [
+    {
+      "command": "python manage.py sync_shopify",
+      "schedule": "15 3 * * *"
+    },
+    {
+      "command": "python manage.py prune_task_results",
+      "schedule": "45 4 * * 0"
+    }
+  ]
 }
